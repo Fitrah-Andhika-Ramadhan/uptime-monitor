@@ -1,14 +1,20 @@
 <?php
 
-require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/app/db.php';
-require_once dirname(__DIR__) . '/app/checker.php';
-require_once dirname(__DIR__) . '/app/ai.php';
-require_once dirname(__DIR__) . '/app/sec.php';
-require_once dirname(__DIR__) . '/app/deploy.php';
-require_once dirname(__DIR__) . '/app/dbui.php';
-require_once dirname(__DIR__) . '/app/tty.php';
-require_once dirname(__DIR__) . '/app/auth.php';
+$base = dirname(__DIR__);
+if (!is_file($base . '/app/db.php') && is_file(__DIR__ . '/app/db.php')) {
+    $base = __DIR__;
+}
+define('APP_BASE', $base);
+
+require_once $base . '/config.php';
+require_once $base . '/app/db.php';
+require_once $base . '/app/checker.php';
+require_once $base . '/app/ai.php';
+require_once $base . '/app/sec.php';
+require_once $base . '/app/deploy.php';
+require_once $base . '/app/dbui.php';
+require_once $base . '/app/tty.php';
+require_once $base . '/app/auth.php';
 
 auth_boot();
 sec_middleware();
@@ -422,7 +428,7 @@ switch ($action) {
             }
         }
         $sid = session_id();
-        $histFile = dirname(__DIR__) . '/data/chat_' . preg_replace('/[^a-zA-Z0-9]/', '', $sid) . '.json';
+        $histFile = APP_BASE . '/data/chat_' . preg_replace('/[^a-zA-Z0-9]/', '', $sid) . '.json';
         $hist = $_SESSION['chat'] ?? [];
         if (!file_exists($histFile) && $hist) {
             file_put_contents($histFile, json_encode($hist), LOCK_EX);
