@@ -1,5 +1,4 @@
 DirectoryIndex index.html index.php
-Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -9,10 +8,10 @@ Options -Indexes
 
   # block public access to sensitive project paths (app code, data, cron, config)
   RewriteRule ^(app|data|cron)(/|$) - [F,L]
-  RewriteRule ^(config\.php|config\.example\.php)$ - [F,L]
+  RewriteRule ^(config\.php|config\.example\.php|DEPLOY-GIT\.txt)$ - [F,L]
 </IfModule>
 
-<FilesMatch "\.(sqlite|sqlite3|db|json)$">
+<FilesMatch "\.(sqlite|sqlite3|db)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
