@@ -1,0 +1,12 @@
+# secrets & local config
+config.php
+data/*.sqlite
+data/*.sqlite-*
+data/banned.json
+data/chat_*.json
+
+# dev artifacts
+cookies.txt
+*.json.tmp
+mon.json
+.mydb

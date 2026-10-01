@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="Xttack - real-time uptime & website performance monitoring with AI analysis.">
+<title>Xttack - AI Uptime Monitor</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2300ff9c'/%3E%3Cpath d='M6 20 L11 11 L15 19 L19 8 L23 16 L26 12' stroke='%23ffffff' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<div id="loginView" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="brand brand-lg"><svg viewBox="0 0 32 32" width="34" height="34"><rect width="32" height="32" rx="9" fill="#00ff9c"/><path d="M6 20 L11 11 L15 19 L19 8 L23 16 L26 12" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Xttack</span></div>
+    <h1>Sign in to dashboard</h1>
+    <p class="dim">Real-time uptime, latency & anomaly monitoring with an AI assistant.</p>
+    <form id="loginForm">
+      <input type="password" id="loginPassword" placeholder="Admin password" autocomplete="current-password" required>
+      <button type="submit" class="btn btn-primary">Sign in</button>
+      <div id="loginError" class="form-error hidden"></div>
+    </form>
+  </div>
+</div>
+
+<div id="appView" class="app hidden">
+  <aside class="sidebar">
+    <div class="brand"><svg viewBox="0 0 32 32" width="26" height="26"><rect width="32" height="32" rx="9" fill="#00ff9c"/><path d="M6 20 L11 11 L15 19 L19 8 L23 16 L26 12" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="brandName">Xttack</span></div>
+
+    <nav class="nav">
+      <a class="nav-item" data-view="dashboard"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</a>
+      <a class="nav-item" data-view="penempatan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 6-9 6-9-6z"/><path d="M5 13v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4"/></svg>Deployments</a>
+      <a class="nav-item" data-view="statistik"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Statistics</a>
+      <a class="nav-item" data-view="domain"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/></svg>Domains</a>
+      <a class="nav-item" data-view="keamanan"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>Security</a>
+      <a class="nav-item" data-view="database"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Database</a>
+
+      <div class="nav-sec">Advanced</div>
+      <div class="nav-group">
+        <button class="nav-item nav-toggle" id="toggleAdvanced" type="button">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg>
+
+          Advanced
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="nav-sub" id="subAdvanced">
+          <a data-panel="cron">Cron Job</a>
+          <a data-panel="php">PHP Info</a>
+          <a data-panel="cache">Cache Manager</a>
+          <a data-panel="ssh">SSH Access</a>
+          <a data-panel="dns">DNS Zone Editor</a>
+          <a data-panel="git">GIT</a>
+          <a data-panel="gate">Deploy Gate</a>
+          <a data-panel="terminal">Terminal</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <button id="btnLogout" class="btn btn-ghost btn-sm" style="width:100%">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        Keluar
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h2 id="viewTitle">Dashboard</h2>
+      <div class="topbar-right">
+        <div id="systemBadge" class="sysbadge hidden"><span class="dot"></span><span id="systemBadgeText"></span></div>
+        <button id="btnInsights" class="btn btn-ghost">Insight AI</button>
+        <button id="btnAdd" class="btn btn-primary" style="display:none">+ Monitor</button>
+      </div>
+    </header>
+
+    <section id="view-dashboard">
+      <div class="list-head">
+        <div class="list-search">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="searchInput" type="text" placeholder="Search by domain or name" autocomplete="off">
+        </div>
+      </div>
+      <div id="monitorGrid"></div>
+      <div id="emptyState" class="empty hidden">
+        <div class="empty-icon">&#9789;</div>
+        <h2>No monitors yet</h2>
+        <p class="dim">Click "+ Add website" to add your first endpoint.</p>
+      </div>
+    </section>
+
+    <section id="view-statistik" class="hidden"></section>
+    <section id="view-panel" class="hidden"></section>
+  </div>
+</div>
+
+<button id="chatFab" class="chat-fab hidden" title="Asisten AI">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+
+<aside id="chatPanel" class="chat-panel hidden" aria-label="Asisten AI">
+  <div class="chat-head">
+    <span class="chat-title">Asisten AI</span>
+    <button id="chatClose" class="iconbtn" title="Tutup">&times;</button>
+  </div>
+  <div id="chatBody" class="chat-body"><div class="chat-hint">Tanya apa saja tentang status monitor Anda...</div></div>
+  <form id="chatForm" class="chat-input">
+    <input id="chatField" type="text" placeholder="Tulis pesan..." autocomplete="off" required>
+    <button type="submit" class="btn-send" title="Kirim"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+  </form>
+</aside>
+
+<div id="modalMon" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><span id="monModalTitle">Monitor baru</span><button id="monModalClose" class="iconbtn">&times;</button></div>
+    <form id="monForm">
+      <label>Nama <input id="fName" required maxlength="200" placeholder="Blog utama"></label>
+      <label>URL <input id="fUrl" type="url" required placeholder="https://contoh.com"></label>
+      <div class="row2">
+        <label>Grup <input id="fGroup" maxlength="60" placeholder="Web" value="Hostinger"></label>
+        <label>Interval <input id="fInterval" type="number" min="5" max="3600" value="5"> </label>
+      </div>
+      <div class="row2">
+        <label>Method <select id="fMethod"><option>HEAD</option><option>GET</option></select></label>
+        <label>Kode HTTP <input id="fCode" type="number" min="0" max="599" placeholder="auto" value="0"></label>
+      </div>
+      <label>Kata kunci <input id="fKeyword" maxlength="300" placeholder="opsional (GET saja)"></label>
+      <div class="modal-actions">
+        <button type="button" id="monCancel" class="btn btn-ghost">Batal</button>
+        <button type="submit" class="btn btn-primary" id="monSubmit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalInsight" class="modal hidden">
+  <div class="modal-card modal-wide">
+    <div class="modal-head"><span>Diagnosa lanjutan</span><button id="insightClose" class="iconbtn">&times;</button></div>
+    <div id="insightBody" class="insight-body"><div class="skeleton pulse">&nbsp;</div></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>
+
+
