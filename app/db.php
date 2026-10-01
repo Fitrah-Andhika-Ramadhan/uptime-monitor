@@ -18,9 +18,16 @@ function db(): PDO
     $pdo = new PDO('sqlite:' . $path);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-    $pdo->exec('PRAGMA journal_mode = WAL');
-    $pdo->exec('PRAGMA busy_timeout = 5000');
-    $pdo->exec('PRAGMA foreign_keys = ON');
+    foreach (['PRAGMA busy_timeout = 5000', 'PRAGMA foreign_keys = ON'] as $p) {
+        try {
+            $pdo->exec($p);
+        } catch (Throwable $e) {
+        }
+    }
+    try {
+        $pdo->exec('PRAGMA journal_mode = WAL');
+    } catch (Throwable $e) {
+    }
 
     $pdo->exec('CREATE TABLE IF NOT EXISTS monitors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

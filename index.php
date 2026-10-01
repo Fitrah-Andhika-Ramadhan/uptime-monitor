@@ -6,6 +6,18 @@ if (!is_file($base . '/app/db.php') && is_file(__DIR__ . '/app/db.php')) {
 }
 define('APP_BASE', $base);
 
+if (!is_file($base . '/config.php')) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok' => false,
+        'error' => 'config.php not found next to app/. Expected at: ' . $base . '/config.php',
+        'hint' => 'Copy config.example.php to config.php in that folder and fill ADMIN_PASSWORD, AI_API_KEY, CRON_SECRET.',
+        'detected_layout' => is_file($base . '/public/index.php') ? 'public/' : 'webroot',
+    ], JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 require_once $base . '/config.php';
 require_once $base . '/app/db.php';
 require_once $base . '/app/checker.php';
@@ -14,7 +26,18 @@ require_once $base . '/app/sec.php';
 require_once $base . '/app/deploy.php';
 require_once $base . '/app/dbui.php';
 require_once $base . '/app/tty.php';
+require_once $base . '/app/diag.php';
 require_once $base . '/app/auth.php';
+
+set_exception_handler(function (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Server error: ' . $e->getMessage(),
+        'where' => basename($e->getFile()) . ':' . $e->getLine(),
+    ], JSON_UNESCAPED_SLASHES);
+});
 
 auth_boot();
 sec_middleware();
@@ -178,6 +201,11 @@ switch ($action) {
     case 'security':
         require_auth();
         jout(['ok' => true, 'scans' => latest_sec_scans()], 200);
+
+    case 'diag':
+        $r = diag_report();
+        session_write_close();
+        jout(['ok' => true, 'diag' => $r], 200);
 
     case 'live':
         while (ob_get_level() > 0) {
