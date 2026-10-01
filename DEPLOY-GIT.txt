@@ -1,0 +1,26 @@
+BRANCH: hostinger-root  (layout: root langsung = aman di-clone ke public_html)
+
+CARA PAKAI DI HOSTINGER (Git):
+1. hPanel > Advanced > GIT (Git deploy) > pilih repo Fitrah-Andhika-Ramadhan/uptime-monitor
+2. Pilih branch: hostinger-root
+3. Publish directory: public_html   (biarkan default; repo ini sudah berisi index.php di root)
+4. Deploy/Pull.
+5. Buat config.php di public_html (tidak ikut repo karena berisi rahasia):
+   - copy isi config.example.php menjadi config.php, isi:
+     ADMIN_PASSWORD, AI_API_KEY, AI_MODEL, CRON_SECRET
+6. Pastikan folder `data` dapat ditulis (Permissions 755, atau 775 bila gagal).
+7. Cron Job setiap 5 menit:
+   /usr/local/bin/php /home/USERNAME/public_html/cron/check.php
+8. GitHub Webhook:
+   https://DOMAIN-ANDA/index.php?action=deploy-hook&secret=CRON_SECRET
+   (Content type: application/json, event: push)
+9. Buka domain -> login (ADMIN_PASSWORD) -> tambah website.
+
+CATATAN
+- File rahasia & sensitif sudah diblokir dari akses web lewat .htaccess
+  (config.php, app/, data/, cron/, serta file .sqlite/.json).
+- Jangan hapus .htaccess: di situ ada aturan proteksi tsb.
+- proc_open kadang dimatikan di shared hosting: Terminal tetap jalan untuk perintah
+  native (ls, cat, tail, grep, mon, check, cron, sql, dns, curl, attacks, bans, unban);
+  perintah OS (php -v, df, uptime, free, ps, ping, git) bisa tampil "exec failed".
+- Update kode: push ke branch hostinger-root, lalu deploy/pull ulang dari hPanel GIT.
