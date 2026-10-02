@@ -821,15 +821,7 @@
         <li>If a monitor shows <i>Could not resolve host</i>, check DNS here.</li>
       </ol>
       <p><a class="panel-link" href="${H}/websites" target="_blank" rel="noopener">Open Domains in hPanel &nearr;</a></p>` },
-    database: { title: 'Database', body: () => `
-      <h3>Database dashboard (SQLite)</h3>
-      <p>Dashboard ini memakai SQLite pada path berikut di akun hosting Anda:</p>
-      <code>data/Xttack.sqlite (folder di samping public_html)</code>
-      <ol>
-        <li>Backup otomatis: salin file tersebut kapan saja via File Manager hPanel.</li>
-        <li>Full reset: delete Xttack.sqlite - cron rebuilds it automatically.</li>
-        <li>Tidak butuh MySQL - hemat resource paket Business.</li>
-      </ol>` },
+
     cron: { title: 'Cron Job', body: () => `
       <h3>Automated uptime check every 5 minutes</h3>
       <p>In hPanel <b>Advanced > Cron Job</b>, add this job:</p>
