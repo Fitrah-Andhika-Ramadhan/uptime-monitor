@@ -758,33 +758,14 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
     box.classList.remove('hidden');
     $('#view-dashboard').classList.add('hidden');
     $('#view-statistik').classList.add('hidden');
-    $('#viewTitle').textContent = 'Database';
-
-    let meta = null;
-    try {
-      meta = await api('db-tables');
-    } catch (e) { }
-    if (!meta) {
-      box.innerHTML = '<div class="panel-card"><h3>Database</h3><p class="dim">Failed to load tables.</p></div>';
-      return;
-    }
-    const tabs = meta.tables.map((t, i) => `<button class="db-tab ${i === 0 ? 'active' : ''}" data-db="${t.name}">${esc(t.name)} <span class="sub">(${t.rows})</span></button>`).join('');
+    $('#viewTitle').textContent = 'Database Admin';
+    
+    // Embed Adminer in iframe
     box.innerHTML = `
-      <div class="list-head"><h2>Database</h2><div class="dim mono" style="font-size:12px">data/Xttack.sqlite — full CRUD on writable tables</div></div>
-      <div class="db-tabs">${tabs}</div>
-      <div id="dbBody"></div>
-      <div class="panel-card" style="margin-top:16px"><h3>SQL console (read-only)</h3>
-        <textarea id="sqlBox" class="sql-box" rows="3" spellcheck="false">SELECT * FROM monitors</textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn btn-primary btn-sm" id="btnSql">Run query</button></div>
-        <div id="sqlRes" style="margin-top:4px"></div>
-      </div>`;
-    box.querySelector('#btnSql').onclick = runSql;
-    box.querySelectorAll('.db-tab').forEach((b) => b.onclick = () => {
-      box.querySelectorAll('.db-tab').forEach((x) => x.classList.remove('active'));
-      b.classList.add('active');
-      loadDbRows(b.dataset.db);
-    });
-    loadDbRows(meta.tables[0].name);
+      <div style="height:calc(100vh - 80px); margin:-15px">
+          <iframe src="dbadmin.php" style="width:100%;height:100%;border:none;background:#fff;border-radius:6px"></iframe>
+      </div>
+    `;
   }
 
   async function loadDbRows(table, page = 1) {
