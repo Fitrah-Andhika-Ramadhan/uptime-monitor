@@ -51,24 +51,35 @@ function ai_context(): string
 }
 
 const AI_SYSTEM = <<<'TXT'
-Kamu adalah asisten monitoring di dalam dashboard uptime bernama %BRIEF%.
-Respond in the user's language; default to concise, professional ENGLISH when they write English, and Indonesian when they use Indonesian, gunakan Markdown sederhana (bold, bullet) bila membantu.
-Data monitor pengguna dikirim di akhir pesan user setiap kali chat. Rujuk data itu, jangan berhalusinasi angka.
-Jika ada insiden aktif, jelaskan akar masalah yang mungkin, level keparahan, dan langkah mitigasi konkret.
-Jika data cukup, tambahkan rekomendasi preventif singkat (mis. timeout, CDN, retry).
-Jawaban maksimal sekitar 250 kata kecuali diminta rinci.
-Jawab langsung dan padat. Jangan mengulang seluruh data mentah; sebut hanya angka yang relevan.
+Kamu adalah asisten monitoring pintar di dalam dashboard uptime bernama %BRIEF%.
+Tugasmu adalah menjawab pertanyaan pengguna dan membantu mereka menganalisa server.
+Respond in the user's language; default to concise, professional ENGLISH when they write English, and Indonesian when they use Indonesian, gunakan Markdown sederhana bila membantu.
+
+PENTING:
+- Jika pengguna hanya menyapa santai (seperti "hi", "halo", "apa kabar"), balas sapaannya dengan ramah dan tanyakan apa yang bisa dibantu, TANPA perlu menjabarkan data dashboard.
+- HANYA jabarkan, analisa, atau sebutkan status dashboard JIKA pengguna bertanya tentang status, masalah, laporan, atau hal terkait sistem/website mereka.
+- Jangan mengulang seluruh data mentah jika tidak diminta; sebut hanya angka yang relevan dengan pertanyaan.
+
+Data real-time dashboard saat ini (Gunakan ini SEBAGAI REFERENSI SAJA, jangan berhalusinasi):
+<DATA_DASHBOARD>
+%CONTEXT%
+</DATA_DASHBOARD>
+
+Jika ada insiden aktif dan pengguna bertanya tentang status, jelaskan kemungkinan masalah dan rekomendasikan solusi. Jawaban maksimal sekitar 200 kata kecuali diminta rinci.
 TXT;
 
 function chat_stream(array $history, string $userMsg, callable $sink): void
 {
     $s = ai_settings();
-    $messages = [['role' => 'system', 'content' => str_replace('%BRIEF%', SITE_NAME, AI_SYSTEM)]];
+    $sys = str_replace('%BRIEF%', SITE_NAME, AI_SYSTEM);
+    $sys = str_replace('%CONTEXT%', ai_context(), $sys);
+    
+    $messages = [['role' => 'system', 'content' => $sys]];
     foreach (array_slice($history, -2) as $m) {
         $messages[] = ['role' => $m['role'], 'content' => (string) $m['content']];
     }
 
-    $messages[] = ['role' => 'user', 'content' => $userMsg . "\n\nDATA DASHBOARD SAAT INI:\n" . ai_context()];
+    $messages[] = ['role' => 'user', 'content' => $userMsg];
 
     $buffer = '';
     $ch = curl_init();
@@ -144,6 +155,9 @@ function generate_insight(): string
         'paragraf pembuka 1-2 kalimat, poin per domain, lalu "Langkah selanjutnya" berisi 3 poin aksi singkat). ' .
         'Gunakan HANYA data berikut. Maksimal 180 kata.' . "\n\n" . ai_context();
 
+    $sys = str_replace('%BRIEF%', SITE_NAME, AI_SYSTEM);
+    $sys = str_replace('%CONTEXT%', '', $sys); // Context is passed in the prompt below
+
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $s['base'] . '/chat/completions',
@@ -158,7 +172,7 @@ function generate_insight(): string
             'temperature' => 0.3,
             'max_tokens' => 500,
             'messages' => [
-                ['role' => 'system', 'content' => str_replace('%BRIEF%', SITE_NAME, AI_SYSTEM)],
+                ['role' => 'system', 'content' => $sys],
                 ['role' => 'user', 'content' => $prompt],
             ],
         ]),
