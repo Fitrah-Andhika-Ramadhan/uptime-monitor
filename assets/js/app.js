@@ -543,8 +543,14 @@
     box.classList.remove('hidden');
     $('#view-dashboard').classList.add('hidden');
     $('#view-statistik').classList.add('hidden');
-    if (name === 'terminal') {
-      box.innerHTML = '<div id="termMount" style="max-width:820px"></div>';
+    if (name === 'ssh' || name === 'terminal') {
+      box.innerHTML = `
+        <div style="margin-bottom:12px">
+            <h3>Terminal Akses (Web Shell)</h3>
+            <p class="dim" style="font-size:13px">Jalankan perintah layaknya SSH langsung dari browser. Perintah yang tersedia: ls, pwd, cat, php, curl, dll.</p>
+        </div>
+        <div id="termMount" style="max-width:820px"></div>
+      `;
       initTerminal(box.querySelector('#termMount'));
       return;
     }
