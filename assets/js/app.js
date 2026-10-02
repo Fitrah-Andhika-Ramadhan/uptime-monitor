@@ -474,22 +474,57 @@
     
     try {
       const res = await api('quick-sec-scan', { method: 'POST', body: JSON.stringify({ url }) });
-      const d = res.result;
-      const headers = ['hsts', 'xfo', 'xcto', 'ref', 'csp'].map(h => `<span class="chip ${d.headers[h] ? 'chip-ok' : 'chip-bad'}">${h}</span>`).join(' ');
-      const bl = Object.keys(d.blacklist).map(k => `<span class="chip ${d.blacklist[k] === 1 ? 'chip-bad' : 'chip-idle'}">${k}</span>`).join(' ');
+      const r = typeof d.raw === 'string' ? JSON.parse(d.raw) : d.raw;
+      const bl = Object.keys(r.blacklist || {}).map(k => `<span class="chip ${r.blacklist[k] === 1 ? 'chip-bad' : 'chip-idle'}">${k}</span>`).join(' ');
       
       resDiv.innerHTML = `
-        <div style="display:flex;gap:15px;align-items:center;margin-bottom:15px">
-            <div style="font-size:32px;font-weight:bold;color:${d.grade==='A'?'#10b981':d.grade==='B'?'#a3e635':d.grade==='C'?'#eab308':'#ef4444'}">${d.grade}</div>
-            <div>
-                <div style="font-size:18px">Score: <b>${d.score}/90</b></div>
-                <div class="dim">IP: ${d.ip || 'Unknown'}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--line)">
+            <div style="flex:1;min-width:200px">
+                <div style="font-size:13px;text-transform:uppercase;color:var(--dim)">Security Risk</div>
+                <div style="font-size:38px;font-weight:900;color:${d.grade==='A'?'#10b981':d.grade==='B'?'#a3e635':d.grade==='C'?'#eab308':'#ef4444'}">${d.grade} <span style="font-size:16px;color:var(--fg)">(${d.score}/90)</span></div>
+                <div style="margin-top:10px;display:flex;gap:10px">
+                    <span class="chip ${r.malware ? 'chip-bad' : 'chip-ok'}">Malware: ${r.malware ? 'Detected' : 'Not Found'}</span>
+                    <span class="chip ${r.blacklisted ? 'chip-bad' : 'chip-ok'}">Blacklist: ${r.blacklisted ? 'Listed' : 'Clean'}</span>
+                </div>
+            </div>
+            <div style="flex:2;min-width:300px;display:grid;grid-template-columns:1fr 1fr;gap:15px;font-size:13px">
+                <div><div style="color:var(--dim);margin-bottom:3px">Target URL</div><b>${url}</b></div>
+                <div><div style="color:var(--dim);margin-bottom:3px">IP Address</div><b>${r.ip || 'Unknown'}</b></div>
+                <div><div style="color:var(--dim);margin-bottom:3px">Web Server</div><b>${r.server || 'Unknown'}</b></div>
+                <div><div style="color:var(--dim);margin-bottom:3px">CMS / Framework</div><b>${r.cms || 'Unknown'}</b></div>
             </div>
         </div>
-        <div style="margin-bottom:8px"><b>SSL:</b> ${d.ssl_ok ? `<span style="color:#10b981">Valid (${d.ssl_days} days) - ${d.ssl_issuer}</span>` : '<span style="color:#ef4444">Invalid / Expired</span>'}</div>
-        <div style="margin-bottom:8px"><b>Security Headers:</b><br><div style="margin-top:5px">${headers}</div></div>
-        <div style="margin-bottom:8px"><b>Email Auth:</b> SPF ${d.spf ? '✅' : '❌'} | DMARC ${d.dmarc ? '✅' : '❌'}</div>
-        <div style="margin-bottom:8px"><b>Reputation:</b><br><div style="margin-top:5px">${bl}</div></div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:20px">
+            <div>
+                <h4 style="margin:0 0 10px 0;color:var(--brand)">SSL & Encryption</h4>
+                <div style="font-size:13px;padding:12px;background:rgba(255,255,255,0.03);border-radius:6px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Certificate</span> ${d.ssl_ok ? '<b style="color:#10b981">Valid</b>' : '<b style="color:#ef4444">Invalid</b>'}</div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Issuer</span> <b>${d.ssl_issuer || '-'}</b></div>
+                    <div style="display:flex;justify-content:space-between"><span>Valid for</span> <b>${d.ssl_days || 0} days</b></div>
+                </div>
+                <h4 style="margin:20px 0 10px 0;color:var(--brand)">Authentication</h4>
+                <div style="font-size:13px;padding:12px;background:rgba(255,255,255,0.03);border-radius:6px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>SPF Record</span> ${d.spf ? '<b style="color:#10b981">Found</b>' : '<b style="color:#ef4444">Missing</b>'}</div>
+                    <div style="display:flex;justify-content:space-between"><span>DMARC Record</span> ${d.dmarc ? '<b style="color:#10b981">Found</b>' : '<b style="color:#ef4444">Missing</b>'}</div>
+                </div>
+            </div>
+            
+            <div>
+                <h4 style="margin:0 0 10px 0;color:var(--brand)">Security Headers</h4>
+                <div style="font-size:13px;padding:12px;background:rgba(255,255,255,0.03);border-radius:6px">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px" title="Strict-Transport-Security"><span>HSTS</span> ${d.headers.hsts ? '<b style="color:#10b981">Enforced</b>' : '<b style="color:#eab308">Missing</b>'}</div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px" title="X-Frame-Options"><span>X-Frame-Options</span> ${d.headers.xfo ? '<b style="color:#10b981">Enforced</b>' : '<b style="color:#eab308">Missing</b>'}</div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px" title="X-Content-Type-Options"><span>X-Content-Type</span> ${d.headers.xcto ? '<b style="color:#10b981">Enforced</b>' : '<b style="color:#eab308">Missing</b>'}</div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:8px" title="Referrer-Policy"><span>Referrer-Policy</span> ${d.headers.ref ? '<b style="color:#10b981">Enforced</b>' : '<b style="color:#eab308">Missing</b>'}</div>
+                    <div style="display:flex;justify-content:space-between" title="Content-Security-Policy"><span>CSP</span> ${d.headers.csp ? '<b style="color:#10b981">Enforced</b>' : '<b style="color:#eab308">Missing</b>'}</div>
+                </div>
+                <h4 style="margin:20px 0 10px 0;color:var(--brand)">Reputation & Blacklist</h4>
+                <div style="font-size:13px;padding:12px;background:rgba(255,255,255,0.03);border-radius:6px;line-height:2">
+                    ${bl}
+                </div>
+            </div>
+        </div>
       `;
       resDiv.style.display = 'block';
     } catch (e) {

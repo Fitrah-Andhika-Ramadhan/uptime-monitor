@@ -135,6 +135,20 @@ function scan_security(array $m, bool $save = true): array
         }
     }
 
+    $server_sw = $hmap['server'] ?? 'Unknown';
+    $x_powered = $hmap['x-powered-by'] ?? '';
+    $cms = 'Unknown';
+    if (stripos((string)$body, 'wp-content/') !== false || stripos((string)$body, 'WordPress') !== false) $cms = 'WordPress';
+    elseif (stripos((string)$body, 'Joomla') !== false) $cms = 'Joomla';
+    elseif (stripos((string)$body, 'Drupal') !== false) $cms = 'Drupal';
+    elseif (stripos((string)$body, 'Laravel') !== false || stripos($x_powered, 'Laravel') !== false) $cms = 'Laravel';
+    elseif (stripos((string)$body, 'Ghost') !== false) $cms = 'Ghost';
+    
+    $malware_found = 0;
+    if (stripos((string)$body, 'eval(base64_decode') !== false || stripos((string)$body, 'document.write(unescape') !== false || stripos((string)$body, 'var _0x') !== false) {
+        $malware_found = 1;
+    }
+
     $score = 0;
     $score += $sslOk ? 30 : 0;
     if ($sslOk && $sslDays !== null && $sslDays > 14) {
@@ -163,7 +177,15 @@ function scan_security(array $m, bool $save = true): array
     $score = min($score, 90);
 
     $headersFound = ['hsts' => $hsts, 'xfo' => $xfo, 'xcto' => $xcto, 'ref' => $ref, 'csp' => $csp];
-    $raw = json_encode(['ip' => $ip, 'blacklist' => $bl, 'code' => $code, 'blacklisted' => $blacklisted ? 1 : 0]);
+    $raw = json_encode([
+        'ip' => $ip, 
+        'blacklist' => $bl, 
+        'code' => $code, 
+        'blacklisted' => $blacklisted ? 1 : 0,
+        'server' => $server_sw,
+        'cms' => $cms,
+        'malware' => $malware_found
+    ]);
 
     if ($save) {
         db()->prepare('INSERT INTO sec_scans (monitor_id, ts, grade, score, ssl_ok, ssl_days, ssl_issuer, https_redirect, headers_ok, headers_missing, spf, dmarc, hsts, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
