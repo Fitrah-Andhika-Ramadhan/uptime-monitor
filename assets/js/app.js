@@ -863,11 +863,24 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
       .sb-struct-type { font-size:11px; color:#60a5fa; background:#1e3a5f20; border:1px solid #1e3a5f; padding:2px 8px; border-radius:4px; font-family:var(--mono); }
       .sb-struct-pk { font-size:11px; color:#10b981; background:#10b98115; border:1px solid #10b98130; padding:2px 8px; border-radius:4px; }
       .sb-pagination { display:flex; align-items:center; gap:8px; padding:10px 16px; border-top:1px solid #1e2433; background:#0d1117; flex-shrink:0; font-size:12px; color:#6b7280; }
+      .sv-canvas { position:relative; width:100%; height:100%; overflow:auto; background:#070d1a; background-image: radial-gradient(#1e243340 1px, transparent 1px); background-size:20px 20px; }
+      .sv-card { position:absolute; width:220px; background:#0d1117; border:1px solid #1e2433; border-radius:8px; box-shadow:0 4px 20px #00000080; cursor:grab; user-select:none; transition:box-shadow .15s; }
+      .sv-card:active { cursor:grabbing; box-shadow:0 8px 30px #14b8a630; }
+      .sv-card-head { padding:10px 14px; background:#14b8a615; border-bottom:1px solid #1e2433; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:8px; }
+      .sv-card-icon { font-size:12px; color:#14b8a6; }
+      .sv-card-name { font-size:13px; font-weight:600; color:#e2e8f0; }
+      .sv-card-badge { margin-left:auto; font-size:10px; color:#6b7280; background:#1e2433; padding:1px 6px; border-radius:8px; }
+      .sv-col { display:flex; align-items:center; gap:8px; padding:5px 14px; border-bottom:1px solid #0d1520; font-size:11.5px; }
+      .sv-col:last-child { border-bottom:none; border-radius:0 0 8px 8px; }
+      .sv-col-name { color:#9ca3af; font-family:var(--mono); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .sv-col-pk { color:#10b981; font-size:9.5px; font-weight:700; background:#10b98120; padding:1px 4px; border-radius:3px; }
+      .sv-col-type { color:#4b5563; font-size:10px; font-family:var(--mono); }
     </style>
     <div class="sb-wrap">
       <!-- icon nav -->
       <div class="sb-nav">
         <button class="sb-nav-btn active" title="Table Editor" id="sbNavTable">⊞</button>
+        <button class="sb-nav-btn" title="Schema Visualizer" id="sbNavSchema">⬡</button>
         <button class="sb-nav-btn" title="SQL Editor" id="sbNavSql">⌨</button>
       </div>
       <!-- sidebar table list -->
@@ -909,8 +922,10 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
     </div>`;
 
     // wire icon nav
-    $('#sbNavTable').onclick = () => { dbState.view = 'table'; $('#sbNavSql').classList.remove('active'); $('#sbNavTable').classList.add('active'); sbShowTableView(); };
-    $('#sbNavSql').onclick   = () => { dbState.view = 'sql';   $('#sbNavTable').classList.remove('active'); $('#sbNavSql').classList.add('active'); sbShowSqlView(); };
+    const sbNavBtns = () => ['sbNavTable','sbNavSchema','sbNavSql'].forEach(id => $('#' + id)?.classList.remove('active'));
+    $('#sbNavTable').onclick  = () => { sbNavBtns(); $('#sbNavTable').classList.add('active');  sbShowTableView(); };
+    $('#sbNavSchema').onclick = () => { sbNavBtns(); $('#sbNavSchema').classList.add('active'); sbShowSchemaView(); };
+    $('#sbNavSql').onclick    = () => { sbNavBtns(); $('#sbNavSql').classList.add('active');    sbShowSqlView(); };
     $('#sbExportBtn').onclick = pmaExport;
 
     // load table list
@@ -950,7 +965,102 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
     const main = $('#sbMain'); if (!main) return;
     main.querySelectorAll('.sb-header,.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = '');
     if ($('#sbSqlWrap')) $('#sbSqlWrap').remove();
+    if ($('#sbSchemaWrap')) $('#sbSchemaWrap').remove();
     $('#sbTableTitle') && (($('#sbTableTitle').textContent = dbState.table || '—'));
+  }
+
+  function sbShowSchemaView() {
+    const main = $('#sbMain'); if (!main) return;
+    main.querySelectorAll('.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
+    if ($('#sbSqlWrap')) $('#sbSqlWrap').remove();
+    if ($('#sbTableTitle')) $('#sbTableTitle').textContent = 'Schema Visualizer';
+    if (!$('#sbSchemaWrap')) {
+      const wrap = document.createElement('div');
+      wrap.id = 'sbSchemaWrap';
+      wrap.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;';
+      wrap.innerHTML = `
+        <div style="padding:10px 16px;border-bottom:1px solid #1e2433;background:#0d1117;display:flex;align-items:center;gap:10px;flex-shrink:0">
+          <b style="color:#e2e8f0;font-size:13px">⬡ Schema Visualizer</b>
+          <span style="color:#6b7280;font-size:11px">Drag cards to reposition · ${dbState.allTables.length} tables</span>
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost btn-sm" id="svAutoLayout">Auto Layout</button>
+        </div>
+        <div class="sv-canvas" id="svCanvas"></div>`;
+      main.appendChild(wrap);
+
+      const canvas = $('#svCanvas');
+      const meta = dbState.allMeta;
+      const cols = 3;
+      const CARD_W = 220, CARD_H_HEAD = 38, COL_H = 26, GAP = 40;
+      const startX = 30, startY = 30;
+
+      dbState.allTables.forEach((t, i) => {
+        const tcols = meta?.columns[t.name] || [];
+        const cx = startX + (i % cols) * (CARD_W + GAP);
+        const cy = startY + Math.floor(i / cols) * (CARD_H_HEAD + tcols.length * COL_H + GAP + 30);
+
+        const card = document.createElement('div');
+        card.className = 'sv-card';
+        card.style.cssText = `left:${cx}px;top:${cy}px;`;
+        card.dataset.tbl = t.name;
+
+        const colsHtml = tcols.map(c => `
+          <div class="sv-col">
+            ${c.pk ? '<span class="sv-col-pk">PK</span>' : '<span style="width:20px;flex-shrink:0"></span>'}
+            <span class="sv-col-name">${esc(c.name)}</span>
+            <span class="sv-col-type">${esc(c.type || 'text').toLowerCase()}</span>
+          </div>`).join('');
+
+        card.innerHTML = `
+          <div class="sv-card-head">
+            <span class="sv-card-icon">▤</span>
+            <span class="sv-card-name">${esc(t.name)}</span>
+            <span class="sv-card-badge">${t.rows} rows</span>
+          </div>
+          ${colsHtml}`;
+
+        canvas.appendChild(card);
+
+        // Draggable
+        let drag = null;
+        card.querySelector('.sv-card-head').addEventListener('mousedown', e => {
+          e.preventDefault();
+          const rect = card.getBoundingClientRect();
+          const canRect = canvas.getBoundingClientRect();
+          drag = { ox: e.clientX - (parseFloat(card.style.left) || 0), oy: e.clientY - (parseFloat(card.style.top) || 0) };
+          const onMove = e2 => {
+            card.style.left = (e2.clientX - drag.ox) + 'px';
+            card.style.top  = (e2.clientY - drag.oy) + 'px';
+          };
+          const onUp = () => { drag = null; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+
+        // Click to open table
+        card.querySelector('.sv-card-head').addEventListener('dblclick', () => {
+          dbState.table = t.name;
+          const sbNavBtnsEl = ['sbNavTable','sbNavSchema','sbNavSql'];
+          sbNavBtnsEl.forEach(id => document.getElementById(id)?.classList.remove('active'));
+          document.getElementById('sbNavTable')?.classList.add('active');
+          document.querySelectorAll('.sb-tbl-item').forEach(el => {
+            el.classList.toggle('active', el.dataset.tbl === t.name);
+          });
+          sbShowTableView(); sbLoadTable();
+        });
+      });
+
+      // Auto Layout button
+      $('#svAutoLayout').onclick = () => {
+        canvas.querySelectorAll('.sv-card').forEach((card, i) => {
+          const tname = card.dataset.tbl;
+          const tcols = meta?.columns[tname] || [];
+          const cx = startX + (i % cols) * (CARD_W + GAP);
+          const cy = startY + Math.floor(i / cols) * (CARD_H_HEAD + tcols.length * COL_H + GAP + 30);
+          card.style.left = cx + 'px'; card.style.top = cy + 'px';
+        });
+      };
+    }
   }
 
   function sbShowSqlView() {
