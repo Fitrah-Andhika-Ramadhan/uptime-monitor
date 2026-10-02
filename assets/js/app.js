@@ -789,14 +789,315 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
   }
 
   /* ================= database CRUD ================= */
-  let dbState = { table: null, page: 1, search: '', allTables: [], allMeta: null };
+  let dbState = { table: null, page: 1, search: '', allTables: [], allMeta: null, view: 'table' };
 
   async function renderDatabase() {
     const box = $('#view-panel');
     box.classList.remove('hidden');
     $('#view-dashboard').classList.add('hidden');
     $('#view-statistik').classList.add('hidden');
-    $('#viewTitle').textContent = 'Database';
+    $('#viewTitle').textContent = 'Table Editor';
+
+    box.innerHTML = `
+    <style>
+      .sb-wrap { display:flex; height:calc(100vh - 90px); margin:-15px; overflow:hidden; font-family:'Inter',sans-serif; }
+      .sb-nav { width:52px; min-width:52px; background:#0d1117; border-right:1px solid #1e2433; display:flex; flex-direction:column; align-items:center; padding:8px 0; gap:2px; }
+      .sb-nav-btn { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#6b7280; font-size:16px; transition:.15s; border:none; background:transparent; }
+      .sb-nav-btn:hover { background:#1e2433; color:#e2e8f0; }
+      .sb-nav-btn.active { background:#14b8a620; color:#14b8a6; }
+      .sb-sidebar { width:220px; min-width:220px; background:#0d1117; border-right:1px solid #1e2433; display:flex; flex-direction:column; overflow:hidden; }
+      .sb-sidebar-head { padding:14px 16px; border-bottom:1px solid #1e2433; }
+      .sb-sidebar-dbname { font-size:13px; font-weight:600; color:#e2e8f0; display:flex; align-items:center; gap:8px; }
+      .sb-sidebar-dbname span { width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block; flex-shrink:0; }
+      .sb-sidebar-sub { font-size:11px; color:#6b7280; margin-top:2px; }
+      .sb-section-label { padding:12px 16px 4px; font-size:10.5px; text-transform:uppercase; letter-spacing:.8px; color:#4b5563; font-weight:600; }
+      .sb-tbl-item { display:flex; align-items:center; gap:8px; padding:6px 16px; cursor:pointer; font-size:12.5px; color:#9ca3af; border-left:2px solid transparent; transition:.12s; }
+      .sb-tbl-item:hover { background:#1e2433; color:#e2e8f0; }
+      .sb-tbl-item.active { background:#14b8a610; border-left-color:#14b8a6; color:#14b8a6; font-weight:500; }
+      .sb-tbl-icon { font-size:12px; opacity:.7; }
+      .sb-tbl-rows-badge { margin-left:auto; font-size:10px; background:#1e2433; padding:1px 6px; border-radius:10px; color:#6b7280; }
+      .sb-tbl-list { flex:1; overflow-y:auto; padding:4px 0 8px; }
+      .sb-main { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#0a0f1e; }
+      .sb-header { padding:12px 20px; border-bottom:1px solid #1e2433; background:#0d1117; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+      .sb-breadcrumb { font-size:13px; color:#6b7280; }
+      .sb-breadcrumb b { color:#e2e8f0; }
+      .sb-header-actions { margin-left:auto; display:flex; gap:8px; align-items:center; }
+      .sb-stat-bar { display:flex; gap:0; border-bottom:1px solid #1e2433; background:#0d1117; flex-shrink:0; }
+      .sb-stat { padding:8px 20px; font-size:12px; color:#6b7280; border-right:1px solid #1e2433; }
+      .sb-stat b { color:#e2e8f0; font-weight:500; }
+      .sb-tab-bar { display:flex; border-bottom:1px solid #1e2433; background:#0d1117; flex-shrink:0; }
+      .sb-tab { padding:9px 18px; font-size:12.5px; cursor:pointer; color:#6b7280; border-bottom:2px solid transparent; transition:.12s; display:flex; align-items:center; gap:6px; }
+      .sb-tab:hover { color:#e2e8f0; }
+      .sb-tab.active { color:#14b8a6; border-bottom-color:#14b8a6; font-weight:500; }
+      .sb-toolbar { display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid #1e2433; background:#0d1117; flex-shrink:0; }
+      .sb-search { background:#1e2433; border:1px solid #2d3748; border-radius:6px; padding:6px 12px; font-size:12.5px; color:#e2e8f0; outline:none; width:220px; }
+      .sb-search:focus { border-color:#14b8a6; }
+      .sb-search::placeholder { color:#4b5563; }
+      .sb-content { flex:1; overflow:auto; }
+      .sb-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+      .sb-tbl thead { position:sticky; top:0; z-index:3; }
+      .sb-tbl th { background:#0d1117; padding:0; border-bottom:1px solid #1e2433; white-space:nowrap; }
+      .sb-th-inner { padding:8px 14px; display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; cursor:default; }
+      .sb-th-type { font-size:9.5px; color:#374151; background:#1e2433; padding:1px 5px; border-radius:3px; font-family:var(--mono); text-transform:lowercase; }
+      .sb-tbl td { padding:8px 14px; border-bottom:1px solid #1a2035; vertical-align:middle; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); font-size:12px; }
+      .sb-tbl tbody tr:hover td { background:#14172b; }
+      .sb-tbl td.v-null { color:#374151; font-style:italic; font-family:inherit; }
+      .sb-tbl td.v-num { color:#a78bfa; }
+      .sb-tbl td.v-str { color:#e2e8f0; }
+      .sb-tbl td.v-json { color:#f59e0b; }
+      .sb-tbl td.v-act { white-space:nowrap; width:70px; text-align:right; }
+      .sb-chk { accent-color:#14b8a6; width:14px; height:14px; cursor:pointer; }
+      .sb-edit-btn { background:transparent; border:1px solid #2d3748; border-radius:4px; padding:2px 8px; font-size:11px; color:#9ca3af; cursor:pointer; transition:.12s; }
+      .sb-edit-btn:hover { border-color:#14b8a6; color:#14b8a6; }
+      .sb-del-btn { background:transparent; border:1px solid transparent; border-radius:4px; padding:2px 6px; font-size:11px; color:#4b5563; cursor:pointer; transition:.12s; }
+      .sb-del-btn:hover { border-color:#ef4444; color:#ef4444; }
+      .sb-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; color:#4b5563; gap:8px; }
+      .sb-empty-icon { font-size:36px; opacity:.3; }
+      .sb-sql-wrap { display:flex; flex-direction:column; height:100%; padding:0; }
+      .sb-sql-header { padding:12px 16px; border-bottom:1px solid #1e2433; display:flex; align-items:center; gap:10px; }
+      .sb-sql-editor { width:100%; flex:1; min-height:140px; background:#0a0f1e; color:#14b8a6; border:none; border-bottom:1px solid #1e2433; padding:16px; font-family:'Fira Code','JetBrains Mono',var(--mono); font-size:13px; resize:none; outline:none; line-height:1.6; }
+      .sb-sql-results { flex:1; overflow:auto; padding:12px 16px; }
+      .sb-struct-row { display:flex; align-items:center; padding:10px 16px; border-bottom:1px solid #1a2035; gap:14px; font-size:12.5px; }
+      .sb-struct-row:hover { background:#14172b; }
+      .sb-struct-name { font-family:var(--mono); color:#e2e8f0; min-width:150px; }
+      .sb-struct-type { font-size:11px; color:#60a5fa; background:#1e3a5f20; border:1px solid #1e3a5f; padding:2px 8px; border-radius:4px; font-family:var(--mono); }
+      .sb-struct-pk { font-size:11px; color:#10b981; background:#10b98115; border:1px solid #10b98130; padding:2px 8px; border-radius:4px; }
+      .sb-pagination { display:flex; align-items:center; gap:8px; padding:10px 16px; border-top:1px solid #1e2433; background:#0d1117; flex-shrink:0; font-size:12px; color:#6b7280; }
+    </style>
+    <div class="sb-wrap">
+      <!-- icon nav -->
+      <div class="sb-nav">
+        <button class="sb-nav-btn active" title="Table Editor" id="sbNavTable">⊞</button>
+        <button class="sb-nav-btn" title="SQL Editor" id="sbNavSql">⌨</button>
+      </div>
+      <!-- sidebar table list -->
+      <div class="sb-sidebar">
+        <div class="sb-sidebar-head">
+          <div class="sb-sidebar-dbname"><span></span> monitors.sqlite</div>
+          <div class="sb-sidebar-sub">SQLite · local</div>
+        </div>
+        <div class="sb-section-label">Tables</div>
+        <div class="sb-tbl-list" id="sbTblList"><div class="sb-tbl-item" style="opacity:.5">Loading…</div></div>
+      </div>
+      <!-- main area -->
+      <div class="sb-main" id="sbMain">
+        <div class="sb-header">
+          <div class="sb-breadcrumb">Table Editor › <b id="sbTableTitle">—</b></div>
+          <div class="sb-header-actions">
+            <button class="btn btn-ghost btn-sm" id="sbExportBtn">⤓ Export SQL</button>
+            <button class="btn btn-primary btn-sm" id="sbInsertBtn">+ Insert Row</button>
+          </div>
+        </div>
+        <div class="sb-stat-bar" id="sbStatBar">
+          <div class="sb-stat">Rows: <b id="sbStatRows">—</b></div>
+          <div class="sb-stat">Page: <b id="sbStatPage">1</b></div>
+          <div class="sb-stat">Columns: <b id="sbStatCols">—</b></div>
+        </div>
+        <div class="sb-toolbar" id="sbToolbar">
+          <input class="sb-search" id="sbSearch" placeholder="🔍  Filter rows…" oninput="sbSearchDebounce()">
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost btn-sm" id="sbPrevBtn" disabled>← Prev</button>
+          <button class="btn btn-ghost btn-sm" id="sbNextBtn">Next →</button>
+        </div>
+        <div class="sb-content" id="sbContent">
+          <div class="sb-empty"><div class="sb-empty-icon">⊞</div><div>Select a table</div></div>
+        </div>
+        <div class="sb-pagination" id="sbPagination" style="display:none">
+          <span id="sbPagInfo"></span>
+        </div>
+      </div>
+    </div>`;
+
+    // wire icon nav
+    $('#sbNavTable').onclick = () => { dbState.view = 'table'; $('#sbNavSql').classList.remove('active'); $('#sbNavTable').classList.add('active'); sbShowTableView(); };
+    $('#sbNavSql').onclick   = () => { dbState.view = 'sql';   $('#sbNavTable').classList.remove('active'); $('#sbNavSql').classList.add('active'); sbShowSqlView(); };
+    $('#sbExportBtn').onclick = pmaExport;
+
+    // load table list
+    try {
+      const meta = await api('db-tables');
+      dbState.allMeta = meta;
+      dbState.allTables = meta.tables;
+      const listEl = $('#sbTblList');
+      listEl.innerHTML = dbState.allTables.map(t => `
+        <div class="sb-tbl-item ${t.name === dbState.table ? 'active' : ''}" data-tbl="${t.name}">
+          <span class="sb-tbl-icon">▤</span>
+          <span>${esc(t.name)}</span>
+          <span class="sb-tbl-rows-badge">${t.rows}</span>
+        </div>`).join('');
+      listEl.querySelectorAll('.sb-tbl-item').forEach(el => el.onclick = () => {
+        dbState.table = el.dataset.tbl;
+        dbState.page = 1; dbState.search = '';
+        if ($('#sbSearch')) $('#sbSearch').value = '';
+        listEl.querySelectorAll('.sb-tbl-item').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        sbShowTableView();
+        sbLoadTable();
+      });
+      if (!dbState.table && dbState.allTables.length) dbState.table = dbState.allTables[0].name;
+      // wire toolbar
+      $('#sbPrevBtn').onclick = () => { dbState.page = Math.max(1, dbState.page-1); sbLoadTable(); };
+      $('#sbNextBtn').onclick = () => { dbState.page++; sbLoadTable(); };
+      $('#sbInsertBtn').onclick = () => { const cols = dbState.allMeta?.columns[dbState.table] || []; dbForm(dbState.table, cols.filter(c => c.name !== 'id'), null); };
+      window.sbSearchDebounce = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { dbState.search = $('#sbSearch')?.value || ''; dbState.page = 1; sbLoadTable(); }, 350); }; })();
+      sbLoadTable();
+    } catch(e) {
+      $('#sbContent').innerHTML = `<div class="sb-empty"><div class="sb-empty-icon">⚠</div><div>${esc(e.message)}</div></div>`;
+    }
+  }
+
+  function sbShowTableView() {
+    const main = $('#sbMain'); if (!main) return;
+    main.querySelectorAll('.sb-header,.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = '');
+    if ($('#sbSqlWrap')) $('#sbSqlWrap').remove();
+    $('#sbTableTitle') && (($('#sbTableTitle').textContent = dbState.table || '—'));
+  }
+
+  function sbShowSqlView() {
+    const main = $('#sbMain'); if (!main) return;
+    main.querySelectorAll('.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
+    if (!$('#sbSqlWrap')) {
+      const div = document.createElement('div');
+      div.id = 'sbSqlWrap';
+      div.className = 'sb-sql-wrap';
+      div.style.flex = '1';
+      div.style.overflow = 'hidden';
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.innerHTML = `
+        <div class="sb-sql-header">
+          <b style="color:#e2e8f0;font-size:13px">SQL Editor</b>
+          <span class="dim" style="font-size:11px">Ctrl+Enter to run</span>
+          <div style="flex:1"></div>
+          <button class="btn btn-primary btn-sm" id="sbSqlRun">▶ Run</button>
+          <button class="btn btn-ghost btn-sm" id="sbSqlClear">Clear</button>
+        </div>
+        <textarea class="sb-sql-editor" id="sbSqlBox" spellcheck="false">SELECT * FROM ${dbState.table || 'monitors'} LIMIT 50</textarea>
+        <div class="sb-sql-results" id="sbSqlResult">
+          <div class="sb-empty" style="height:120px"><div class="sb-empty-icon" style="font-size:24px">▶</div><div style="font-size:12px">Run a query to see results</div></div>
+        </div>`;
+      main.appendChild(div);
+      $('#sbSqlRun').onclick = sbRunSql;
+      $('#sbSqlClear').onclick = () => { $('#sbSqlBox').value = ''; $('#sbSqlResult').innerHTML = ''; };
+      $('#sbSqlBox').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sbRunSql(); });
+    }
+    $('#sbTableTitle').textContent = 'SQL Editor';
+  }
+
+  async function sbLoadTable() {
+    const content = $('#sbContent'); if (!content) return;
+    if (!dbState.table) return;
+    content.innerHTML = `<div class="sb-empty" style="height:100px"><div style="font-size:20px;opacity:.3">⟳</div><div>Loading…</div></div>`;
+    try {
+      const params = 'db-rows&table=' + encodeURIComponent(dbState.table) + '&page=' + dbState.page + (dbState.search ? '&q=' + encodeURIComponent(dbState.search) : '');
+      const res = await api(params);
+      const rows = res.rows || [];
+      const meta = dbState.allMeta;
+      const cols = meta?.columns[dbState.table] || (rows.length ? Object.keys(rows[0]).map(n => ({ name: n, type: 'TEXT' })) : []);
+      const editable = (dbState.allTables.find(t => t.name === dbState.table) || {}).editable;
+      const tblMeta = dbState.allTables.find(t => t.name === dbState.table);
+
+      // update stat bar
+      if ($('#sbStatRows')) $('#sbStatRows').textContent = tblMeta?.rows ?? '?';
+      if ($('#sbStatPage')) $('#sbStatPage').textContent = dbState.page;
+      if ($('#sbStatCols')) $('#sbStatCols').textContent = cols.length;
+      if ($('#sbTableTitle')) $('#sbTableTitle').textContent = dbState.table;
+      if ($('#sbPrevBtn')) $('#sbPrevBtn').disabled = dbState.page <= 1;
+      if ($('#sbInsertBtn')) $('#sbInsertBtn').style.display = editable ? '' : 'none';
+      const pag = $('#sbPagination');
+      if (pag) { pag.style.display = ''; if ($('#sbPagInfo')) $('#sbPagInfo').textContent = `Showing ${rows.length} rows · page ${dbState.page}`; }
+
+      if (!rows.length) {
+        content.innerHTML = `<div class="sb-empty"><div class="sb-empty-icon">◻</div><div>No rows found${dbState.search ? ' matching "'+esc(dbState.search)+'"' : ''}</div></div>`;
+        return;
+      }
+
+      const ths = `<th style="width:36px"><div class="sb-th-inner"><input type="checkbox" class="sb-chk" id="sbChkAll"></div></th>` +
+        cols.map(c => `<th><div class="sb-th-inner">${esc(c.name)} <span class="sb-th-type">${esc(c.type || 'text')}</span></div></th>`).join('') +
+        (editable ? '<th style="width:80px"></th>' : '');
+
+      const trs = rows.map(r => {
+        const tds = cols.map(c => {
+          const v = r[c.name];
+          if (v === null || v === undefined) return '<td class="v-null">NULL</td>';
+          const sv = String(v);
+          let cls = 'v-str';
+          if (!isNaN(v) && sv !== '') cls = 'v-num';
+          else if (sv.startsWith('{') || sv.startsWith('[')) cls = 'v-json';
+          const display = sv.length > 55 ? sv.slice(0, 55) + '…' : sv;
+          return `<td class="${cls}" title="${esc(sv)}">${esc(display)}</td>`;
+        }).join('');
+        const acts = editable ? `<td class="v-act">
+          <button class="sb-edit-btn" data-e="${r.id}">Edit</button>
+          <button class="sb-del-btn" data-d="${r.id}">✕</button>
+        </td>` : '';
+        return `<tr><td style="width:36px"><input type="checkbox" class="sb-chk" data-rid="${r.id}"></td>${tds}${acts}</tr>`;
+      }).join('');
+
+      content.innerHTML = `<table class="sb-tbl"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+      content.querySelector('#sbChkAll')?.addEventListener('change', e => content.querySelectorAll('[data-rid]').forEach(c => c.checked = e.target.checked));
+
+      if (editable) {
+        content.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+          const r = rows.find(x => x.id === b.dataset.e) || rows.find(x => x.id === +b.dataset.e);
+          dbForm(dbState.table, cols.filter(c => c.name !== 'id'), r);
+        });
+        content.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+          if (!confirm('Delete row #' + b.dataset.d + ' from ' + dbState.table + '?')) return;
+          try { await api('db-delete', { method: 'POST', body: { table: dbState.table, id: +b.dataset.d } }); toast('Row deleted'); sbLoadTable(); }
+          catch(e) { toast(e.message, true); }
+        });
+      }
+    } catch(e) {
+      content.innerHTML = `<div class="sb-empty"><div class="sb-empty-icon">⚠</div><div>${esc(e.message)}</div></div>`;
+    }
+  }
+
+  async function sbRunSql() {
+    const sql = $('#sbSqlBox')?.value?.trim();
+    const res = $('#sbSqlResult');
+    if (!sql || !res) return;
+    res.innerHTML = '<div class="sb-empty" style="height:80px"><div style="opacity:.5">Running…</div></div>';
+    try {
+      const data = await api('db-exec', { method: 'POST', body: { sql } });
+      const rows = data.rows || [];
+      if (!rows.length) {
+        res.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:12px;background:#10b98110;border:1px solid #10b98130;border-radius:6px;color:#10b981;font-size:12.5px">
+          <span style="font-size:16px">✓</span> Query executed successfully — 0 rows returned.</div>`;
+        return;
+      }
+      const cols = Object.keys(rows[0]);
+      const h = '<tr>' + cols.map(c => `<th><div class="sb-th-inner">${esc(c)}</div></th>`).join('') + '</tr>';
+      const tr = rows.map(r => '<tr>' + cols.map(c => { const v = r[c]; const sv = v === null ? 'NULL' : String(v); return `<td class="${v === null ? 'v-null' : !isNaN(v) && sv !== '' ? 'v-num' : 'v-str'}">${esc(sv)}</td>`; }).join('') + '</tr>').join('');
+      res.innerHTML = `<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px">${rows.length} rows returned</div>
+        <div style="overflow:auto;border:1px solid #1e2433;border-radius:6px"><table class="sb-tbl"><thead>${h}</thead><tbody>${tr}</tbody></table></div>`;
+    } catch(e) {
+      res.innerHTML = `<div style="padding:12px;background:#ef444410;border:1px solid #ef444430;border-radius:6px;color:#ef4444;font-family:var(--mono);font-size:12px">ERROR: ${esc(e.message)}</div>`;
+    }
+  }
+
+  // Keep pmaExport for Export SQL button
+  async function pmaExport() {
+    try {
+      const meta = await api('db-tables');
+      let sql = '-- SQLite Export\n-- Generated: ' + new Date().toISOString() + '\n\n';
+      for (const t of meta.tables) {
+        sql += `-- Table: ${t.name}\n`;
+        const rows = (await api('db-rows&table=' + encodeURIComponent(t.name) + '&page=1')).rows;
+        rows.forEach(r => {
+          const cols = Object.keys(r).join(', ');
+          const vals = Object.values(r).map(v => v === null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`).join(', ');
+          sql += `INSERT INTO "${t.name}" (${cols}) VALUES (${vals});\n`;
+        });
+        sql += '\n';
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([sql], { type: 'text/plain' }));
+      a.download = 'monitors-export.sql';
+      a.click();
+      toast('Export selesai!');
+    } catch(e) { toast(e.message, true); }
+  }
 
     box.innerHTML = `
       <style>
