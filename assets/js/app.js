@@ -789,19 +789,258 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
   }
 
   /* ================= database CRUD ================= */
+  let dbState = { table: null, page: 1, search: '', allTables: [], allMeta: null };
+
   async function renderDatabase() {
     const box = $('#view-panel');
     box.classList.remove('hidden');
     $('#view-dashboard').classList.add('hidden');
     $('#view-statistik').classList.add('hidden');
-    $('#viewTitle').textContent = 'Database Admin';
-    
-    // Embed Adminer in iframe
+    $('#viewTitle').textContent = 'Database';
+
     box.innerHTML = `
-      <div style="height:calc(100vh - 80px); margin:-15px">
-          <iframe src="dbadmin.php" style="width:100%;height:100%;border:none;background:#fff;border-radius:6px"></iframe>
+      <style>
+        .pma-wrap { display:flex; gap:0; height:calc(100vh - 90px); overflow:hidden; margin:-15px; }
+        .pma-sidebar { width:210px; min-width:210px; background:#0a1628; border-right:1px solid var(--line); overflow-y:auto; display:flex; flex-direction:column; }
+        .pma-sidebar-head { padding:14px 16px 10px; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); border-bottom:1px solid var(--line); }
+        .pma-sidebar-head b { display:block; font-size:14px; color:var(--brand); text-transform:none; letter-spacing:0; margin-top:2px; }
+        .pma-tbl-item { display:flex; align-items:center; justify-content:space-between; padding:7px 14px 7px 18px; cursor:pointer; font-size:13px; border-left:3px solid transparent; transition:.15s; }
+        .pma-tbl-item:hover { background:rgba(255,255,255,.04); }
+        .pma-tbl-item.active { background:rgba(20,184,166,.1); border-left-color:var(--brand); color:var(--brand); }
+        .pma-tbl-rows { font-size:11px; color:var(--dim); background:rgba(255,255,255,.06); padding:1px 5px; border-radius:8px; }
+        .pma-main { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+        .pma-toolbar { display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--line); background:#0d1f3c; flex-shrink:0; }
+        .pma-tabs { display:flex; gap:0; border-bottom:1px solid var(--line); background:#0a1628; flex-shrink:0; }
+        .pma-tab { padding:8px 18px; font-size:12.5px; cursor:pointer; border-bottom:2px solid transparent; color:var(--dim); transition:.15s; }
+        .pma-tab:hover { color:var(--fg); }
+        .pma-tab.active { color:var(--brand); border-bottom-color:var(--brand); }
+        .pma-content { flex:1; overflow:auto; padding:16px; }
+        .pma-tbl-wrap { overflow:auto; max-height:calc(100vh - 260px); border:1px solid var(--line); border-radius:8px; }
+        .pma-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+        .pma-tbl thead { position:sticky; top:0; z-index:2; }
+        .pma-tbl th { background:#0a1628; padding:9px 12px; text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); white-space:nowrap; border-bottom:2px solid var(--line); }
+        .pma-tbl td { padding:7px 12px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:top; white-space:nowrap; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+        .pma-tbl tr:hover td { background:rgba(255,255,255,.03); }
+        .pma-tbl td.null-val { color:var(--dim); font-style:italic; }
+        .pma-tbl td.num-val { color:#a78bfa; font-family:var(--mono); }
+        .pma-tbl td.str-val { color:var(--fg); font-family:var(--mono); font-size:11.5px; }
+        .pma-tbl td.act-col { white-space:nowrap; width:60px; }
+        .pma-pagination { display:flex; align-items:center; gap:10px; padding:10px 0; font-size:13px; }
+        .pma-struct th { font-size:12px; }
+        .pma-struct td { font-family:var(--mono); font-size:12px; }
+        .sql-editor { width:100%; background:#0a1628; color:var(--brand); border:1px solid var(--line); border-radius:6px; padding:12px; font-family:var(--mono); font-size:13px; resize:vertical; min-height:100px; outline:none; }
+        .sql-editor:focus { border-color:var(--brand); }
+        .pma-row-check { width:16px; height:16px; cursor:pointer; accent-color:var(--brand); }
+      </style>
+      <div class="pma-wrap">
+        <div class="pma-sidebar">
+          <div class="pma-sidebar-head">SQLite<b id="pmaDbName">monitors.sqlite</b></div>
+          <div id="pmaTblList" style="padding:8px 0"><div class="dim" style="padding:12px 16px;font-size:12px">Loading…</div></div>
+        </div>
+        <div class="pma-main">
+          <div class="pma-toolbar">
+            <input class="input" id="pmaSearch" placeholder="Search rows…" style="width:200px;padding:5px 10px;font-size:12px" oninput="pmaSearchDebounce()">
+            <div style="flex:1"></div>
+            <span id="pmaRowCount" class="dim" style="font-size:12px"></span>
+            <button class="btn btn-ghost btn-sm" id="pmaPrev" disabled>← Prev</button>
+            <span id="pmaPageInfo" class="dim mono" style="font-size:11px;min-width:50px;text-align:center">p.1</span>
+            <button class="btn btn-ghost btn-sm" id="pmaNext">Next →</button>
+            <button class="btn btn-primary btn-sm" id="pmaAddRow" style="margin-left:8px">+ New Row</button>
+            <button class="btn btn-ghost btn-sm" id="pmaExport">⤓ Export SQL</button>
+          </div>
+          <div class="pma-tabs">
+            <div class="pma-tab active" data-ptab="browse">Browse</div>
+            <div class="pma-tab" data-ptab="structure">Structure</div>
+            <div class="pma-tab" data-ptab="sql">SQL Console</div>
+          </div>
+          <div class="pma-content" id="pmaContent"></div>
+        </div>
+      </div>`;
+
+    // load tables list
+    try {
+      const meta = await api('db-tables');
+      dbState.allMeta = meta;
+      dbState.allTables = meta.tables;
+      const listEl = $('#pmaTblList');
+      listEl.innerHTML = dbState.allTables.map(t => `
+        <div class="pma-tbl-item ${t.name === dbState.table ? 'active' : ''}" data-tbl="${t.name}">
+          <span>📋 ${esc(t.name)}</span>
+          <span class="pma-tbl-rows">${t.rows}</span>
+        </div>`).join('');
+      listEl.querySelectorAll('.pma-tbl-item').forEach(el => el.onclick = () => {
+        dbState.table = el.dataset.tbl;
+        dbState.page = 1; dbState.search = '';
+        listEl.querySelectorAll('.pma-tbl-item').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        pmaActivateTab('browse');
+        pmaLoadBrowse();
+      });
+      if (!dbState.table && dbState.allTables.length) dbState.table = dbState.allTables[0].name;
+      // wire tabs
+      document.querySelectorAll('.pma-tab').forEach(tab => tab.onclick = () => {
+        document.querySelectorAll('.pma-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        pmaActivateTab(tab.dataset.ptab);
+        if (tab.dataset.ptab === 'browse') pmaLoadBrowse();
+        else if (tab.dataset.ptab === 'structure') pmaLoadStructure();
+        else if (tab.dataset.ptab === 'sql') pmaLoadSql();
+      });
+      // wire toolbar
+      $('#pmaPrev').onclick = () => { dbState.page = Math.max(1, dbState.page - 1); pmaLoadBrowse(); };
+      $('#pmaNext').onclick = () => { dbState.page++; pmaLoadBrowse(); };
+      $('#pmaAddRow').onclick = () => {
+        const cols = dbState.allMeta?.columns[dbState.table] || [];
+        dbForm(dbState.table, cols.filter(c => c.name !== 'id'), null);
+      };
+      $('#pmaExport').onclick = pmaExport;
+      window.pmaSearchDebounce = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { dbState.search = $('#pmaSearch').value; dbState.page = 1; pmaLoadBrowse(); }, 350); }; })();
+      pmaLoadBrowse();
+    } catch(e) {
+      $('#pmaContent').innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    }
+  }
+
+  function pmaActivateTab(name) {
+    const toolbar = document.querySelector('.pma-toolbar');
+    if (toolbar) toolbar.style.display = name === 'browse' ? '' : 'none';
+  }
+
+  async function pmaLoadBrowse() {
+    const content = $('#pmaContent'); if (!content) return;
+    content.innerHTML = '<div class="dim" style="padding:20px">Loading rows…</div>';
+    try {
+      const params = 'db-rows&table=' + encodeURIComponent(dbState.table) + '&page=' + dbState.page + (dbState.search ? '&q=' + encodeURIComponent(dbState.search) : '');
+      const res = await api(params);
+      const rows = res.rows || [];
+      const meta = dbState.allMeta;
+      const cols = meta?.columns[dbState.table] || (rows.length ? Object.keys(rows[0]).map(n => ({ name: n })) : []);
+      const editable = (dbState.allTables.find(t => t.name === dbState.table) || {}).editable;
+
+      $('#pmaRowCount').textContent = rows.length + ' rows shown';
+      $('#pmaPageInfo').textContent = 'p.' + dbState.page;
+      $('#pmaPrev').disabled = dbState.page <= 1;
+      $('#pmaAddRow').style.display = editable ? '' : 'none';
+
+      if (!rows.length) { content.innerHTML = '<div class="dim" style="padding:30px;text-align:center">No rows found</div>'; return; }
+
+      const ths = '<th style="width:30px"><input type="checkbox" class="pma-row-check" id="pmaChkAll"></th>' +
+        cols.map(c => `<th>${esc(c.name)}</th>`).join('') + (editable ? '<th style="width:80px">Actions</th>' : '');
+
+      const trs = rows.map(r => {
+        const tds = cols.map(c => {
+          const v = r[c.name];
+          if (v === null || v === undefined) return '<td class="null-val">NULL</td>';
+          const sv = String(v);
+          const isNum = !isNaN(v) && sv !== '';
+          const cls = isNum ? 'num-val' : 'str-val';
+          const display = sv.length > 60 ? sv.slice(0, 60) + '…' : sv;
+          return `<td class="${cls}" title="${esc(sv)}">${esc(display)}</td>`;
+        }).join('');
+        const acts = editable ? `<td class="act-col">
+          <button class="iconbtn" data-e="${r.id}" title="Edit" style="font-size:13px">✎</button>
+          <button class="iconbtn" data-d="${r.id}" title="Delete" style="font-size:13px;color:#ef4444">✕</button>
+        </td>` : '';
+        return `<tr><td><input type="checkbox" class="pma-row-check" data-rid="${r.id}"></td>${tds}${acts}</tr>`;
+      }).join('');
+
+      content.innerHTML = `
+        <div class="pma-tbl-wrap">
+          <table class="pma-tbl">
+            <thead><tr>${ths}</tr></thead>
+            <tbody>${trs}</tbody>
+          </table>
+        </div>`;
+
+      content.querySelector('#pmaChkAll')?.addEventListener('change', e => {
+        content.querySelectorAll('[data-rid]').forEach(c => c.checked = e.target.checked);
+      });
+
+      if (editable) {
+        content.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+          const r = rows.find(x => x.id === b.dataset.e) || rows.find(x => x.id === +b.dataset.e);
+          dbForm(dbState.table, cols.filter(c => c.name !== 'id'), r);
+        });
+        content.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+          if (!confirm('Delete row #' + b.dataset.d + '?')) return;
+          try { await api('db-delete', { method: 'POST', body: { table: dbState.table, id: +b.dataset.d } }); toast('Row deleted'); pmaLoadBrowse(); }
+          catch(e) { toast(e.message, true); }
+        });
+      }
+    } catch(e) {
+      content.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    }
+  }
+
+  async function pmaLoadStructure() {
+    const content = $('#pmaContent'); if (!content) return;
+    const cols = dbState.allMeta?.columns[dbState.table] || [];
+    const ths = '<th>#</th><th>Column</th><th>Type</th><th>Primary Key</th>';
+    const trs = cols.map((c, i) => `<tr>
+      <td class="num-val">${i + 1}</td>
+      <td><b>${esc(c.name)}</b></td>
+      <td><span style="color:#60a5fa;font-family:var(--mono)">${esc(c.type || 'TEXT')}</span></td>
+      <td>${c.pk ? '<span style="color:#10b981">✓ PRIMARY KEY</span>' : '<span class="dim">—</span>'}</td>
+    </tr>`).join('');
+    content.innerHTML = `
+      <div class="pma-tbl-wrap">
+        <table class="pma-tbl pma-struct"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>
+      </div>`;
+  }
+
+  function pmaLoadSql() {
+    const content = $('#pmaContent'); if (!content) return;
+    content.innerHTML = `
+      <div style="margin-bottom:10px"><b>SQL Console</b> <span class="dim" style="font-size:12px">— All queries allowed (SELECT, UPDATE, DELETE, DROP)</span></div>
+      <textarea class="sql-editor" id="pmaSqlBox" rows="6">SELECT * FROM ${dbState.table || 'monitors'} LIMIT 50</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary" id="pmaSqlRun">▶ Run Query</button>
+        <button class="btn btn-ghost" id="pmaSqlClear">Clear</button>
       </div>
-    `;
+      <div id="pmaSqlResult" style="margin-top:16px"></div>`;
+    $('#pmaSqlRun').onclick = pmaRunSql;
+    $('#pmaSqlClear').onclick = () => { $('#pmaSqlBox').value = ''; $('#pmaSqlResult').innerHTML = ''; };
+    $('#pmaSqlBox').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') pmaRunSql(); });
+  }
+
+  async function pmaRunSql() {
+    const sql = $('#pmaSqlBox')?.value?.trim();
+    const res = $('#pmaSqlResult');
+    if (!sql || !res) return;
+    res.innerHTML = '<div class="dim">Running…</div>';
+    try {
+      const data = await api('db-exec', { method: 'POST', body: { sql } });
+      const rows = data.rows || [];
+      if (!rows.length) { res.innerHTML = '<div class="dim mono" style="padding:10px;border:1px solid var(--line);border-radius:6px">✓ Query OK — 0 rows returned</div>'; return; }
+      const cols = Object.keys(rows[0]);
+      const h = '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
+      const tr = rows.map(r => '<tr>' + cols.map(c => `<td class="str-val">${esc(String(r[c] ?? 'NULL'))}</td>`).join('') + '</tr>').join('');
+      res.innerHTML = `<div class="dim" style="font-size:12px;margin-bottom:6px">${rows.length} rows returned</div><div class="pma-tbl-wrap"><table class="pma-tbl"><thead>${h}</thead><tbody>${tr}</tbody></table></div>`;
+    } catch(e) {
+      res.innerHTML = `<div style="color:#ef4444;padding:10px;border:1px solid #ef4444;border-radius:6px;font-family:var(--mono);font-size:12px">ERROR: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function pmaExport() {
+    try {
+      const meta = await api('db-tables');
+      let sql = '-- SQLite Export\n-- Generated: ' + new Date().toISOString() + '\n\n';
+      for (const t of meta.tables) {
+        sql += `-- Table: ${t.name}\n`;
+        const rows = (await api('db-rows&table=' + encodeURIComponent(t.name) + '&page=1')).rows;
+        rows.forEach(r => {
+          const cols = Object.keys(r).join(', ');
+          const vals = Object.values(r).map(v => v === null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`).join(', ');
+          sql += `INSERT INTO "${t.name}" (${cols}) VALUES (${vals});\n`;
+        });
+        sql += '\n';
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([sql], { type: 'text/plain' }));
+      a.download = 'database-export.sql';
+      a.click();
+      toast('Export selesai!');
+    } catch(e) { toast(e.message, true); }
   }
 
   async function loadDbRows(table, page = 1) {

@@ -313,13 +313,20 @@ switch ($action) {
     case 'db-exec':
         check_csrf();
         require_auth();
-        $sql = (string) ($in['sql'] ?? '');
+        $sql = trim((string) ($in['sql'] ?? ''));
+        if ($sql === '') fail('SQL required', 400);
         try {
-            $rows = dbui_sql_readonly($sql);
+            $head = strtolower(preg_replace('/^\s*\(?([\w]+).*$/s', '$1', $sql));
+            if (in_array($head, ['select', 'pragma', 'explain', 'with'], true)) {
+                $rows = dbui_sql_readonly($sql);
+                jout(['ok' => true, 'rows' => $rows], 200);
+            } else {
+                db()->exec($sql);
+                jout(['ok' => true, 'rows' => [], 'affected' => db()->lastInsertId()], 200);
+            }
         } catch (Throwable $e) {
             fail($e->getMessage(), 400);
         }
-        jout(['ok' => true, 'rows' => $rows], 200);
 
     case 'tty':
         check_csrf();
