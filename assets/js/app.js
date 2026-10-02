@@ -473,7 +473,8 @@
     resDiv.style.display = 'none';
     
     try {
-      const res = await api('quick-sec-scan', { method: 'POST', body: JSON.stringify({ url }) });
+      const res = await api('quick-sec-scan', { method: 'POST', body: { url } });
+      const d = res.result;
       const r = typeof d.raw === 'string' ? JSON.parse(d.raw) : d.raw;
       const bl = Object.keys(r.blacklist || {}).map(k => `<span class="chip ${r.blacklist[k] === 1 ? 'chip-bad' : 'chip-idle'}">${k}</span>`).join(' ');
       
