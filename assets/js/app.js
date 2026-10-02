@@ -537,7 +537,7 @@
   };
 
   /* ================= navigation & views ================= */
-  const VIEW_TITLES = { dashboard: 'Dashboard', statistik: 'Statistics', domain: 'Domain', keamanan: 'Security', database: 'Database', penempatan: 'Deployments', cron: 'Cron Job', php: 'Info PHP', cache: 'Cache Manager', ssh: 'SSH Access', dns: 'DNS Zone Editor', git: 'GIT', gate: 'Gerbang Deploy', terminal: 'Terminal' };
+  const VIEW_TITLES = { dashboard: 'Dashboard', statistik: 'Statistics', domain: 'Domain', keamanan: 'Security', database: 'Database', penempatan: 'Deployments', auth: 'Authentication', cron: 'Cron Job', php: 'Info PHP', cache: 'Cache Manager', ssh: 'SSH Access', dns: 'DNS Zone Editor', git: 'GIT', gate: 'Gerbang Deploy', terminal: 'Terminal' };
 
   function switchView(name) {
     state.view = name;
@@ -551,7 +551,157 @@
     if (name === 'keamanan') renderSecurity();
     if (name === 'penempatan') renderDeployments();
     if (name === 'database') renderDatabase();
+    if (name === 'auth') renderAuth();
     if (VIEW_PANELS[name]) renderPanel(name);
+  }
+
+  /* ================= Authentication / Users ================= */
+  async function renderAuth() {
+    const box = $('#view-panel');
+    box.classList.remove('hidden');
+    $('#view-dashboard').classList.add('hidden');
+    $('#view-statistik').classList.add('hidden');
+    const me = state.me || {};
+    const now = Math.floor(Date.now() / 1000);
+    const sessionAge = me.ts ? Math.max(0, now - me.ts) : 0;
+    const sessionAgo = sessionAge < 60 ? sessionAge + 's ago' : sessionAge < 3600 ? Math.floor(sessionAge/60) + ' min ago' : Math.floor(sessionAge/3600) + ' hr ago';
+
+    box.innerHTML = `
+    <style>
+      .auth-header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--line); margin:-15px -15px 0; }
+      .auth-tabs { display:flex; border-bottom:1px solid var(--line); padding:0 20px; background:rgba(0,0,0,.2); margin:0 -15px 20px; }
+      .auth-tab { padding:10px 18px; font-size:12.5px; cursor:pointer; color:var(--dim); border-bottom:2px solid transparent; transition:.12s; }
+      .auth-tab.active { color:var(--brand); border-bottom-color:var(--brand); }
+      .auth-search { background:rgba(0,0,0,.3); border:1px solid var(--line); border-radius:6px; padding:7px 14px 7px 32px; font-size:13px; color:var(--fg); outline:none; width:260px; }
+      .auth-search:focus { border-color:var(--brand); }
+      .auth-pill { font-size:11px; padding:3px 10px; border-radius:12px; border:1px solid var(--line); color:var(--dim); background:rgba(255,255,255,.04); cursor:pointer; }
+      .auth-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+      .auth-table th { padding:9px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); border-bottom:2px solid var(--line); white-space:nowrap; }
+      .auth-table td { padding:11px 14px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+      .auth-table tr:hover td { background:rgba(255,255,255,.02); }
+      .auth-avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#14b8a6,#6366f1); display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; }
+      .auth-uid { font-family:var(--mono); font-size:11px; color:var(--dim); }
+      .auth-provider-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:10px; font-size:11px; background:rgba(255,255,255,.06); color:var(--fg); }
+      .auth-stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+      .auth-stat-card { background:rgba(0,0,0,.3); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+      .auth-stat-label { font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+      .auth-stat-val { font-size:26px; font-weight:700; color:var(--fg); }
+      .auth-config-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+      .auth-toggle { position:relative; width:38px; height:20px; }
+      .auth-toggle input { opacity:0; width:0; height:0; }
+      .auth-slider { position:absolute; inset:0; background:#374151; border-radius:20px; cursor:pointer; transition:.2s; }
+      .auth-slider:before { content:''; position:absolute; width:14px; height:14px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+      .auth-toggle input:checked + .auth-slider { background:#14b8a6; }
+      .auth-toggle input:checked + .auth-slider:before { transform:translateX(18px); }
+    </style>
+    <div class="auth-header">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#14b8a6" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--fg)">Authentication</div>
+        <div style="font-size:12px;color:var(--dim)">Manage users, sessions, and authentication settings</div>
+      </div>
+      <div style="margin-left:auto"><button class="btn btn-primary btn-sm" id="authAddUserBtn">+ Add user</button></div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" data-atab="users">Users</div>
+      <div class="auth-tab" data-atab="sessions">Sessions</div>
+      <div class="auth-tab" data-atab="config">Configuration</div>
+      <div class="auth-tab" data-atab="logs">Audit Logs</div>
+    </div>
+    <div id="authContent">
+      <div class="auth-stat-grid">
+        <div class="auth-stat-card"><div class="auth-stat-label">Total Users</div><div class="auth-stat-val">1</div></div>
+        <div class="auth-stat-card"><div class="auth-stat-label">Active Sessions</div><div class="auth-stat-val">1</div></div>
+        <div class="auth-stat-card"><div class="auth-stat-label">Failed Logins (7d)</div><div class="auth-stat-val" id="authFailedCount">—</div></div>
+        <div class="auth-stat-card"><div class="auth-stat-label">Banned IPs</div><div class="auth-stat-val" id="authBannedCount">—</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="position:relative">
+          <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input class="auth-search" placeholder="Search by email address…">
+        </div>
+        <button class="auth-pill">All columns</button>
+        <span class="dim" style="font-size:12px;margin-left:auto">Sorted by user ID</span>
+      </div>
+      <table class="auth-table">
+        <thead><tr>
+          <th style="width:36px"><input type="checkbox" style="accent-color:var(--brand);width:14px;height:14px"></th>
+          <th></th><th>UID</th><th>Display name</th><th>Email</th><th>Last Sign In</th><th>Provider</th><th>Provider type</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" style="accent-color:var(--brand);width:14px;height:14px"></td>
+            <td><div class="auth-avatar">A</div></td>
+            <td><span class="auth-uid">usr-admin-00000001</span></td>
+            <td><span class="dim">—</span></td>
+            <td style="color:var(--fg)">${esc(me.email || 'Administrator')}</td>
+            <td><span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;margin-right:5px;box-shadow:0 0 6px #10b981"></span><span style="font-size:12px">${sessionAgo}</span></td>
+            <td><div class="auth-provider-chip">🔐 Password</div></td>
+            <td><span class="dim" style="font-size:12px">Builtin</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+
+    document.querySelectorAll('.auth-tab').forEach(tab => tab.onclick = () => {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      authShowTab(tab.dataset.atab, me, sessionAgo);
+    });
+
+    $('#authAddUserBtn').onclick = () => toast('Sistem ini single-user. Hanya satu admin yang diizinkan.', true);
+
+    try {
+      const att = await api('attacks').catch(() => ({ bans: {}, hits: [] }));
+      if ($('#authBannedCount')) $('#authBannedCount').textContent = Object.keys(att.bans || {}).length;
+      if ($('#authFailedCount')) $('#authFailedCount').textContent = (att.hits || []).filter(h => h.type === 'login_fail').length;
+    } catch(e) {}
+  }
+
+  function authShowTab(tab, me, sessionAgo) {
+    const content = $('#authContent'); if (!content) return;
+    if (tab === 'sessions') {
+      content.innerHTML = `
+        <h4 style="color:var(--fg);margin-bottom:14px">Active Sessions</h4>
+        <table class="auth-table">
+          <thead><tr><th>User</th><th>IP</th><th>Started</th><th>Status</th><th></th></tr></thead>
+          <tbody><tr>
+            <td><div style="display:flex;align-items:center;gap:8px"><div class="auth-avatar">A</div><span>admin</span></div></td>
+            <td><span class="auth-uid">current browser</span></td>
+            <td><span style="font-size:12px">This session (${sessionAgo || 'now'})</span></td>
+            <td><span class="chip chip-ok">Active</span></td>
+            <td><button class="btn btn-ghost btn-sm" onclick="document.getElementById('btnLogout').click()">Revoke</button></td>
+          </tr></tbody>
+        </table>`;
+    } else if (tab === 'config') {
+      const cfgs = [
+        { label: 'Password Authentication', desc: 'Allow login with email and password', on: true },
+        { label: 'Rate Limiting (auto-ban)', desc: 'Ban IPs after too many failed attempts', on: true },
+        { label: 'Session Timeout', desc: 'Expire inactive sessions automatically', on: true },
+        { label: 'CSRF Protection', desc: 'Token-based CSRF forgery protection', on: true },
+      ];
+      content.innerHTML = `<h4 style="color:var(--fg);margin-bottom:6px">Auth Configuration</h4>
+        <p class="dim" style="font-size:12.5px;margin-bottom:18px">Control authentication behavior and security settings.</p>` +
+        cfgs.map(c => `<div class="auth-config-row">
+          <div><div style="font-size:13px;font-weight:500">${c.label}</div><div style="font-size:12px;color:var(--dim)">${c.desc}</div></div>
+          <label class="auth-toggle"><input type="checkbox" ${c.on ? 'checked' : ''} disabled><span class="auth-slider"></span></label>
+        </div>`).join('');
+    } else if (tab === 'logs') {
+      content.innerHTML = `<h4 style="color:var(--fg);margin-bottom:14px">Audit Logs</h4><div id="authLogList"><div class="dim" style="padding:12px">Loading…</div></div>`;
+      api('attacks').then(att => {
+        const hits = (att.hits || []).slice(-20).reverse();
+        if (!hits.length) { $('#authLogList').innerHTML = '<div class="dim" style="padding:12px;font-size:12.5px">No recent events.</div>'; return; }
+        const rows = hits.map(h => {
+          const t = new Date((h.ts || 0)*1000).toLocaleString('id-ID');
+          const icon = h.type === 'login_fail' ? '❌' : h.type === 'ban' ? '🔒' : '🔍';
+          return `<tr><td style="font-size:12px;color:var(--dim)">${t}</td><td>${icon}</td>
+            <td style="font-size:12.5px">${esc(h.type || 'event')}</td>
+            <td style="font-family:var(--mono);font-size:11.5px;color:var(--dim)">${esc(h.ip || '—')}</td>
+            <td style="font-size:12px;color:var(--dim)">${esc(String(h.ua || '—')).slice(0,40)}</td></tr>`;
+        }).join('');
+        if ($('#authLogList')) $('#authLogList').innerHTML = `<table class="auth-table"><thead><tr><th>Time</th><th></th><th>Event</th><th>IP</th><th>User Agent</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }).catch(() => { if($('#authLogList')) $('#authLogList').innerHTML = '<div class="dim" style="padding:12px">Could not load.</div>'; });
+    }
   }
 
   const H = 'https://hpanel.hostinger.com';
