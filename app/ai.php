@@ -70,6 +70,7 @@ function chat_stream(array $history, string $userMsg, callable $sink): void
 
     $messages[] = ['role' => 'user', 'content' => $userMsg . "\n\nDATA DASHBOARD SAAT INI:\n" . ai_context()];
 
+    $buffer = '';
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $s['base'] . '/chat/completions',
@@ -88,11 +89,13 @@ function chat_stream(array $history, string $userMsg, callable $sink): void
             'messages' => $messages,
         ]),
         CURLOPT_TIMEOUT => 60,
-        CURLOPT_WRITEFUNCTION => function ($ch, $data) use ($sink, &$got, &$rawTail) {
+        CURLOPT_WRITEFUNCTION => function ($ch, $data) use ($sink, &$got, &$rawTail, &$buffer) {
             $len = strlen($data);
             $rawTail = substr(($rawTail ?? '') . $data, -2000);
-            foreach (explode("\n", $data) as $line) {
-                $line = trim($line);
+            $buffer .= $data;
+            while (($pos = strpos($buffer, "\n")) !== false) {
+                $line = trim(substr($buffer, 0, $pos));
+                $buffer = substr($buffer, $pos + 1);
                 if (strpos($line, 'data:') !== 0) {
                     continue;
                 }
