@@ -57,6 +57,7 @@ Data monitor pengguna dikirim di akhir pesan user setiap kali chat. Rujuk data i
 Jika ada insiden aktif, jelaskan akar masalah yang mungkin, level keparahan, dan langkah mitigasi konkret.
 Jika data cukup, tambahkan rekomendasi preventif singkat (mis. timeout, CDN, retry).
 Jawaban maksimal sekitar 250 kata kecuali diminta rinci.
+Jawab langsung dan padat. Jangan mengulang seluruh data mentah; sebut hanya angka yang relevan.
 TXT;
 
 function chat_stream(array $history, string $userMsg, callable $sink): void
