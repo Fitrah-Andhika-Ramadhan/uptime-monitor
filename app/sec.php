@@ -29,12 +29,12 @@ function blacklist_checks(string $host, string $ip): array
             continue;
         }
         $ipr = (string) ($rec[0]['ip'] ?? '');
-        if (strpos($ipr, '127.0.0.') !== 0) {
-            $res[$k] = -1;
+        if (strpos($ipr, '127.0.0.') !== 0 || $ipr === '127.0.0.1' || strpos($ipr, '127.255.') === 0) {
+            $res[$k] = -1; // Resolver di-blokir atau IP salah, anggap tidak masuk blacklist
             continue;
         }
         $last = (int) substr($ipr, strrpos($ipr, '.') + 1);
-        $res[$k] = ($last >= 1 && $last <= 11) ? 1 : -1;
+        $res[$k] = ($last > 1 && $last <= 11) ? 1 : -1;
     }
     return $res;
 }
