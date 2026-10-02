@@ -5,7 +5,6 @@ function blacklist_checks(string $host, string $ip): array
     $list = [
         'dbl_dblspamhaus' => 'Spamhaus DBL',
         'dbl_surbl' => 'SURBL',
-        'dnsbl_sorbs' => 'sorbs (ip)',
         'dbl_zen' => 'Spamhaus Zen (ip)',
     ];
     $res = [];
@@ -22,7 +21,7 @@ function blacklist_checks(string $host, string $ip): array
                 $res[$k] = -1;
                 continue;
             }
-            $query = $ipOctets . ($k === 'dnsbl_sorbs' ? 'dnsbl.sorbs.net' : 'zen.spamhaus.org');
+            $query = $ipOctets . 'zen.spamhaus.org';
         }
         $rec = @dns_get_record($query, DNS_A);
         if (!$rec || !count($rec)) {
@@ -93,14 +92,24 @@ function scan_security(array $m): array
     $sslOk = 0;
     $sslDays = null;
     $sslIssuer = '';
-    $last = $cert ? reset($cert) : null;
-    if ($last && isset($last['Expire date'])) {
-        $exp = strtotime($last['Expire date']);
-        if ($exp > time()) {
-            $sslOk = 1;
-            $sslDays = (int) ceil(($exp - time()) / 86400);
-            $sslIssuer = $last['Issuer'] ?? '';
+    
+    // Fallback using stream_socket_client because Hostinger's cURL often drops CURLINFO_CERTINFO
+    $ctx = stream_context_create(['ssl' => ['capture_peer_cert' => true, 'verify_peer' => false, 'verify_peer_name' => false]]);
+    $client = @stream_socket_client('ssl://' . $host . ':443', $errNo, $errStr, 5, STREAM_CLIENT_CONNECT, $ctx);
+    if ($client) {
+        $params = stream_context_get_params($client);
+        if (isset($params['options']['ssl']['peer_certificate'])) {
+            $parsed = openssl_x509_parse($params['options']['ssl']['peer_certificate']);
+            if ($parsed && isset($parsed['validTo_time_t'])) {
+                $exp = (int) $parsed['validTo_time_t'];
+                if ($exp > time()) {
+                    $sslOk = 1;
+                    $sslDays = (int) ceil(($exp - time()) / 86400);
+                    $sslIssuer = $parsed['issuer']['O'] ?? ($parsed['issuer']['CN'] ?? '');
+                }
+            }
         }
+        fclose($client);
     }
 
     $hsts = $have('strict-transport-security') ? 1 : 0;
