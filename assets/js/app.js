@@ -537,7 +537,7 @@
   };
 
   /* ================= navigation & views ================= */
-  const VIEW_TITLES = { dashboard: 'Dashboard', statistik: 'Statistics', domain: 'Domain', keamanan: 'Security', database: 'Database', penempatan: 'Deployments', auth: 'Authentication', cron: 'Cron Job', php: 'Info PHP', cache: 'Cache Manager', ssh: 'SSH Access', dns: 'DNS Zone Editor', git: 'GIT', gate: 'Gerbang Deploy', terminal: 'Terminal' };
+  const VIEW_TITLES = { dashboard: 'Dashboard', statistik: 'Statistics', domain: 'Domain', keamanan: 'Security', database: 'Database', penempatan: 'Deployments', auth: 'Authentication', storage: 'Storage', cron: 'Cron Job', php: 'Info PHP', cache: 'Cache Manager', ssh: 'SSH Access', dns: 'DNS Zone Editor', git: 'GIT', gate: 'Gerbang Deploy', terminal: 'Terminal' };
 
   function switchView(name) {
     state.view = name;
@@ -552,7 +552,113 @@
     if (name === 'penempatan') renderDeployments();
     if (name === 'database') renderDatabase();
     if (name === 'auth') renderAuth();
+    if (name === 'storage') renderStorage();
     if (VIEW_PANELS[name]) renderPanel(name);
+  }
+
+  /* ================= Storage ================= */
+  async function renderStorage() {
+    const box = $('#view-panel');
+    box.classList.remove('hidden');
+    $('#view-dashboard').classList.add('hidden');
+    $('#view-statistik').classList.add('hidden');
+    $('#viewTitle').textContent = 'Files';
+
+    box.innerHTML = `
+    <style>
+      .st-wrap { padding:0; }
+      .st-header { padding:16px 20px; border-bottom:1px solid var(--line); margin:-15px -15px 0; }
+      .st-title { font-size:20px; font-weight:600; color:var(--fg); margin-bottom:4px; }
+      .st-desc { font-size:13px; color:var(--dim); margin-bottom:16px; }
+      .st-tabs { display:flex; gap:20px; }
+      .st-tab { padding:8px 0; font-size:13px; cursor:pointer; color:var(--dim); border-bottom:2px solid transparent; transition:.12s; font-weight:500; }
+      .st-tab.active { color:var(--fg); border-bottom-color:var(--fg); }
+      .st-tab:hover:not(.active) { color:var(--fg); }
+      .st-content { padding:24px 20px; margin:0 -15px; }
+      .st-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+      .st-search { background:rgba(0,0,0,.3); border:1px solid var(--line); border-radius:6px; padding:7px 14px 7px 32px; font-size:13px; color:var(--fg); outline:none; width:280px; }
+      .st-search:focus { border-color:var(--brand); }
+      .st-btn-ghost { background:transparent; border:1px solid var(--line); color:var(--fg); padding:6px 12px; border-radius:6px; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:.15s; }
+      .st-btn-ghost:hover { background:rgba(255,255,255,.05); border-color:#4b5563; }
+      .st-table-wrap { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:rgba(0,0,0,.2); }
+      .st-table { width:100%; border-collapse:collapse; font-size:12.5px; }
+      .st-table th { padding:12px 16px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); border-bottom:1px solid var(--line); font-weight:600; }
+      .st-table td { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,.03); vertical-align:middle; color:var(--fg); }
+      .st-table tr:last-child td { border-bottom:none; }
+      .st-table tr:hover td { background:rgba(255,255,255,.02); cursor:pointer; }
+      .st-folder-icon { color:var(--dim); margin-right:10px; font-size:16px; vertical-align:middle; }
+      .st-badge-public { background:#f59e0b20; color:#f59e0b; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:600; margin-left:8px; border:1px solid #f59e0b40; }
+    </style>
+    <div class="st-wrap">
+      <div class="st-header">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div class="st-title">Files</div>
+            <div class="st-desc">General file storage for most types of digital content</div>
+          </div>
+          <button class="st-btn-ghost" style="color:var(--dim)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg> Docs</button>
+        </div>
+        <div class="st-tabs">
+          <div class="st-tab active">Buckets</div>
+          <div class="st-tab">Settings</div>
+          <div class="st-tab">Policies</div>
+        </div>
+      </div>
+      <div class="st-content">
+        <div class="st-toolbar">
+          <div style="position:relative">
+            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input class="st-search" placeholder="Search for a bucket">
+          </div>
+          <button class="st-btn-ghost"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg> Sorted by created at</button>
+          <button class="st-btn-ghost"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Refresh</button>
+          <div style="flex:1"></div>
+          <button class="btn btn-primary" style="background:#10b981;border:none;color:#fff;font-weight:600;padding:7px 14px;border-radius:6px;font-size:13px" id="stNewBucketBtn">+ New bucket</button>
+        </div>
+        
+        <div class="st-table-wrap">
+          <table class="st-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Policies</th>
+                <th>File Size Limit</th>
+                <th>Allowed MIME Types</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr onclick="toast('Bucket view belum diimplementasikan.', false)">
+                <td>
+                  <span class="st-folder-icon">📁</span>
+                  <span style="font-weight:500">file</span>
+                  <span class="st-badge-public">PUBLIC</span>
+                </td>
+                <td style="color:var(--dim)">0</td>
+                <td style="color:var(--dim)">Unset (50 MB)</td>
+                <td style="color:var(--dim)">Any</td>
+                <td style="color:var(--dim);text-align:right">›</td>
+              </tr>
+              <tr onclick="toast('Bucket view belum diimplementasikan.', false)">
+                <td>
+                  <span class="st-folder-icon">📁</span>
+                  <span style="font-weight:500">assets</span>
+                  <span class="st-badge-public">PUBLIC</span>
+                </td>
+                <td style="color:var(--dim)">2</td>
+                <td style="color:var(--dim)">Unset (50 MB)</td>
+                <td style="color:var(--dim)">image/*</td>
+                <td style="color:var(--dim);text-align:right">›</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+    $('#stNewBucketBtn').onclick = () => {
+      toast('Fitur New Bucket sedang dalam pengembangan.', false);
+    };
   }
 
   /* ================= Authentication / Users ================= */
