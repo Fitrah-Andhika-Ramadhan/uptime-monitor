@@ -39,9 +39,9 @@ function blacklist_checks(string $host, string $ip): array
     return $res;
 }
 
-function scan_security(array $m): array
+function scan_security(array $m, bool $save = true): array
 {
-    $url = (string) $m['url'];
+    $url = (string) ($m['url'] ?? '');
     $host = parse_url($url, PHP_URL_HOST) ?: '';
     $host = preg_replace('/^www\./i', '', $host);
     $https = stripos($url, 'https://') === 0;
@@ -165,11 +165,13 @@ function scan_security(array $m): array
     $headersFound = ['hsts' => $hsts, 'xfo' => $xfo, 'xcto' => $xcto, 'ref' => $ref, 'csp' => $csp];
     $raw = json_encode(['ip' => $ip, 'blacklist' => $bl, 'code' => $code, 'blacklisted' => $blacklisted ? 1 : 0]);
 
-    db()->prepare('INSERT INTO sec_scans (monitor_id, ts, grade, score, ssl_ok, ssl_days, ssl_issuer, https_redirect, headers_ok, headers_missing, spf, dmarc, hsts, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([
-            (int) $m['id'], time(), $grade, $score, $sslOk, $sslDays, $sslIssuer, $https ? 1 : 0,
-            json_encode($headersFound), '', $spf, $dmarc, $hsts, $raw,
-        ]);
+    if ($save) {
+        db()->prepare('INSERT INTO sec_scans (monitor_id, ts, grade, score, ssl_ok, ssl_days, ssl_issuer, https_redirect, headers_ok, headers_missing, spf, dmarc, hsts, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([
+                (int) ($m['id'] ?? 0), time(), $grade, $score, $sslOk, $sslDays, $sslIssuer, $https ? 1 : 0,
+                json_encode($headersFound), '', $spf, $dmarc, $hsts, $raw,
+            ]);
+    }
 
     return [
         'grade' => $grade,

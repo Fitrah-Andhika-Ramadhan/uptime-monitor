@@ -194,6 +194,16 @@ switch ($action) {
     case 'instant-check':
     case 'insight':
     case 'chat':
+    case 'quick-sec-scan':
+        check_csrf();
+        require_auth();
+        $url = trim((string) ($in['url'] ?? ''));
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+            fail('Valid URL required.', 400);
+        }
+        $res = scan_security(['url' => $url], false);
+        jout(['ok' => true, 'result' => $res]);
+
     case 'security-scan':
         check_csrf();
         require_auth();

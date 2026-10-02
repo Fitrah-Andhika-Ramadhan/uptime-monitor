@@ -463,6 +463,43 @@
     }
   }
 
+  window.runQuickSecScan = async function() {
+    const url = $('#quickSecUrl').value.trim();
+    if (!url) return alert('Masukkan URL!');
+    const btn = $('#btnQuickSec');
+    const resDiv = $('#quickSecResult');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    resDiv.style.display = 'none';
+    
+    try {
+      const res = await api('quick-sec-scan', { method: 'POST', body: JSON.stringify({ url }) });
+      const d = res.result;
+      const headers = ['hsts', 'xfo', 'xcto', 'ref', 'csp'].map(h => `<span class="chip ${d.headers[h] ? 'chip-ok' : 'chip-bad'}">${h}</span>`).join(' ');
+      const bl = Object.keys(d.blacklist).map(k => `<span class="chip ${d.blacklist[k] === 1 ? 'chip-bad' : 'chip-idle'}">${k}</span>`).join(' ');
+      
+      resDiv.innerHTML = `
+        <div style="display:flex;gap:15px;align-items:center;margin-bottom:15px">
+            <div style="font-size:32px;font-weight:bold;color:${d.grade==='A'?'#10b981':d.grade==='B'?'#a3e635':d.grade==='C'?'#eab308':'#ef4444'}">${d.grade}</div>
+            <div>
+                <div style="font-size:18px">Score: <b>${d.score}/90</b></div>
+                <div class="dim">IP: ${d.ip || 'Unknown'}</div>
+            </div>
+        </div>
+        <div style="margin-bottom:8px"><b>SSL:</b> ${d.ssl_ok ? `<span style="color:#10b981">Valid (${d.ssl_days} days) - ${d.ssl_issuer}</span>` : '<span style="color:#ef4444">Invalid / Expired</span>'}</div>
+        <div style="margin-bottom:8px"><b>Security Headers:</b><br><div style="margin-top:5px">${headers}</div></div>
+        <div style="margin-bottom:8px"><b>Email Auth:</b> SPF ${d.spf ? '✅' : '❌'} | DMARC ${d.dmarc ? '✅' : '❌'}</div>
+        <div style="margin-bottom:8px"><b>Reputation:</b><br><div style="margin-top:5px">${bl}</div></div>
+      `;
+      resDiv.style.display = 'block';
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Scan Website';
+    }
+  };
+
   /* ================= navigation & views ================= */
   const VIEW_TITLES = { dashboard: 'Dashboard', statistik: 'Statistics', domain: 'Domain', keamanan: 'Security', database: 'Database', penempatan: 'Deployments', cron: 'Cron Job', php: 'Info PHP', cache: 'Cache Manager', ssh: 'SSH Access', dns: 'DNS Zone Editor', git: 'GIT', gate: 'Gerbang Deploy', terminal: 'Terminal' };
 
@@ -611,7 +648,18 @@
       </div>` : `<p class="dim">No attack logs yet. Honeypot & middleware are active — every guess for .env/wp-admin/SQL injection/scanner tercatat di sini.</p>`;
     const banHtml = (att.bans && Object.keys(att.bans).length) ? `<div class="sub dim" style="margin-top:8px">Banned IPs: ${Object.keys(att.bans).map(esc).join(', ')} <button class="btn btn-ghost btn-sm" id="btnClearBan">Clear all bans</button></div>` : '';
 
-    let html = `<div class="list-head"><h2>Attack Detection</h2>
+    let html = `
+      <div class="list-head"><h2>Quick Security Scan (Manual)</h2>
+      <div class="dim" style="font-size:12.5px">Periksa keamanan web mana saja melalui link (tanpa perlu masuk monitor)</div></div>
+      <div class="panel-card" style="margin-bottom:20px;border-color:var(--brand)">
+          <div style="display:flex;gap:10px">
+              <input type="text" id="quickSecUrl" class="input" placeholder="https://example.com" style="flex:1">
+              <button class="btn" onclick="runQuickSecScan()" id="btnQuickSec">Scan Website</button>
+          </div>
+          <div id="quickSecResult" style="margin-top:15px;display:none;background:#052e16;padding:15px;border:1px solid var(--brand);border-radius:10px"></div>
+      </div>
+      
+      <div class="list-head"><h2>Attack Detection</h2>
       <div class="dim" style="font-size:12.5px">honeypot · scanner UA · SQLi/XSS · bruteforce — auto-ban 24 jam</div></div>
       <div class="panel-card">${attHtml}${banHtml}</div>`;
 
