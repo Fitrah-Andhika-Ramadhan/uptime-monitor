@@ -1125,25 +1125,32 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
       .sv-col-type { color:#4b5563; font-size:10px; font-family:var(--mono); }
     </style>
     <div class="sb-wrap">
-      <!-- icon nav -->
-      <div class="sb-nav">
-        <button class="sb-nav-btn active" title="Table Editor" id="sbNavTable">⊞</button>
-        <button class="sb-nav-btn" title="Schema Visualizer" id="sbNavSchema">⬡</button>
-        <button class="sb-nav-btn" title="SQL Editor" id="sbNavSql">⌨</button>
-      </div>
-      <!-- sidebar table list -->
-      <div class="sb-sidebar">
-        <div class="sb-sidebar-head">
-          <div class="sb-sidebar-dbname"><span></span> monitors.sqlite</div>
-          <div class="sb-sidebar-sub">SQLite · local</div>
-        </div>
-        <div class="sb-section-label">Tables</div>
-        <div class="sb-tbl-list" id="sbTblList"><div class="sb-tbl-item" style="opacity:.5">Loading…</div></div>
+      <!-- sidebar -->
+      <div class="sb-sidebar" style="width:250px">
+        <div style="padding:16px 20px; font-size:14px; font-weight:600; color:#e2e8f0; border-bottom:1px solid #1e2433; display:flex; align-items:center; gap:8px;">Database</div>
+        
+        <div class="sb-section-label" style="margin-top:8px">DATABASE MANAGEMENT</div>
+        <div class="sb-tbl-item active" id="menuSchema">Schema Visualizer</div>
+        <div class="sb-tbl-item" id="menuTables">Tables</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Functions</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Triggers</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Enumerated Types</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Extensions</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Indexes</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Publications</div>
+
+        <div class="sb-section-label" style="margin-top:16px">ACCESS CONTROL</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Policies</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Roles</div>
+
+        <div class="sb-section-label" style="margin-top:16px">CONFIGURATION</div>
+        <div class="sb-tbl-item" id="menuSql">SQL Console</div>
+        <div class="sb-tbl-item" style="opacity:0.4;cursor:default">Settings</div>
       </div>
       <!-- main area -->
       <div class="sb-main" id="sbMain">
         <div class="sb-header">
-          <div class="sb-breadcrumb">Table Editor › <b id="sbTableTitle">—</b></div>
+          <div class="sb-breadcrumb">Tables › <select id="sbTableSelect" style="background:transparent;border:none;color:#e2e8f0;font-weight:600;font-size:13px;outline:none;cursor:pointer"><option>—</option></select></div>
           <div class="sb-header-actions">
             <button class="btn btn-ghost btn-sm" id="sbExportBtn">⤓ Export SQL</button>
             <button class="btn btn-primary btn-sm" id="sbInsertBtn">+ Insert Row</button>
@@ -1169,11 +1176,11 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
       </div>
     </div>`;
 
-    // wire icon nav
-    const sbNavBtns = () => ['sbNavTable','sbNavSchema','sbNavSql'].forEach(id => $('#' + id)?.classList.remove('active'));
-    $('#sbNavTable').onclick  = () => { sbNavBtns(); $('#sbNavTable').classList.add('active');  sbShowTableView(); };
-    $('#sbNavSchema').onclick = () => { sbNavBtns(); $('#sbNavSchema').classList.add('active'); sbShowSchemaView(); };
-    $('#sbNavSql').onclick    = () => { sbNavBtns(); $('#sbNavSql').classList.add('active');    sbShowSqlView(); };
+    // wire sidebar nav
+    const sbNavBtns = () => ['menuTables','menuSchema','menuSql'].forEach(id => $('#' + id)?.classList.remove('active'));
+    $('#menuTables').onclick  = () => { sbNavBtns(); $('#menuTables').classList.add('active');  sbShowTableView(); sbLoadTable(); };
+    $('#menuSchema').onclick = () => { sbNavBtns(); $('#menuSchema').classList.add('active'); sbShowSchemaView(); };
+    $('#menuSql').onclick    = () => { sbNavBtns(); $('#menuSql').classList.add('active');    sbShowSqlView(); };
     $('#sbExportBtn').onclick = pmaExport;
 
     // load table list
@@ -1181,29 +1188,26 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
       const meta = await api('db-tables');
       dbState.allMeta = meta;
       dbState.allTables = meta.tables;
-      const listEl = $('#sbTblList');
-      listEl.innerHTML = dbState.allTables.map(t => `
-        <div class="sb-tbl-item ${t.name === dbState.table ? 'active' : ''}" data-tbl="${t.name}">
-          <span class="sb-tbl-icon">▤</span>
-          <span>${esc(t.name)}</span>
-          <span class="sb-tbl-rows-badge">${t.rows}</span>
-        </div>`).join('');
-      listEl.querySelectorAll('.sb-tbl-item').forEach(el => el.onclick = () => {
-        dbState.table = el.dataset.tbl;
-        dbState.page = 1; dbState.search = '';
-        if ($('#sbSearch')) $('#sbSearch').value = '';
-        listEl.querySelectorAll('.sb-tbl-item').forEach(x => x.classList.remove('active'));
-        el.classList.add('active');
-        sbShowTableView();
-        sbLoadTable();
-      });
       if (!dbState.table && dbState.allTables.length) dbState.table = dbState.allTables[0].name;
+
+      const sel = $('#sbTableSelect');
+      if (sel) {
+        sel.innerHTML = dbState.allTables.map(t => `<option value="${t.name}" ${t.name === dbState.table ? 'selected' : ''}>${esc(t.name)}</option>`).join('');
+        sel.onchange = () => {
+          dbState.table = sel.value;
+          dbState.page = 1; dbState.search = '';
+          if ($('#sbSearch')) $('#sbSearch').value = '';
+          sbLoadTable();
+        };
+      }
+
       // wire toolbar
       $('#sbPrevBtn').onclick = () => { dbState.page = Math.max(1, dbState.page-1); sbLoadTable(); };
       $('#sbNextBtn').onclick = () => { dbState.page++; sbLoadTable(); };
       $('#sbInsertBtn').onclick = () => { const cols = dbState.allMeta?.columns[dbState.table] || []; dbForm(dbState.table, cols.filter(c => c.name !== 'id'), null); };
       window.sbSearchDebounce = (() => { let t; return () => { clearTimeout(t); t = setTimeout(() => { dbState.search = $('#sbSearch')?.value || ''; dbState.page = 1; sbLoadTable(); }, 350); }; })();
-      sbLoadTable();
+      
+      sbShowSchemaView(); // Start with schema view active as requested
     } catch(e) {
       $('#sbContent').innerHTML = `<div class="sb-empty"><div class="sb-empty-icon">⚠</div><div>${esc(e.message)}</div></div>`;
     }
@@ -1214,14 +1218,13 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
     main.querySelectorAll('.sb-header,.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = '');
     if ($('#sbSqlWrap')) $('#sbSqlWrap').remove();
     if ($('#sbSchemaWrap')) $('#sbSchemaWrap').remove();
-    $('#sbTableTitle') && (($('#sbTableTitle').textContent = dbState.table || '—'));
+    if ($('#sbTableSelect')) $('#sbTableSelect').value = dbState.table || '';
   }
 
   function sbShowSchemaView() {
     const main = $('#sbMain'); if (!main) return;
-    main.querySelectorAll('.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
+    main.querySelectorAll('.sb-header,.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
     if ($('#sbSqlWrap')) $('#sbSqlWrap').remove();
-    if ($('#sbTableTitle')) $('#sbTableTitle').textContent = 'Schema Visualizer';
     if (!$('#sbSchemaWrap')) {
       const wrap = document.createElement('div');
       wrap.id = 'sbSchemaWrap';
@@ -1288,12 +1291,10 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
         // Click to open table
         card.querySelector('.sv-card-head').addEventListener('dblclick', () => {
           dbState.table = t.name;
-          const sbNavBtnsEl = ['sbNavTable','sbNavSchema','sbNavSql'];
+          const sbNavBtnsEl = ['menuTables','menuSchema','menuSql'];
           sbNavBtnsEl.forEach(id => document.getElementById(id)?.classList.remove('active'));
-          document.getElementById('sbNavTable')?.classList.add('active');
-          document.querySelectorAll('.sb-tbl-item').forEach(el => {
-            el.classList.toggle('active', el.dataset.tbl === t.name);
-          });
+          document.getElementById('menuTables')?.classList.add('active');
+          if ($('#sbTableSelect')) $('#sbTableSelect').value = t.name;
           sbShowTableView(); sbLoadTable();
         });
       });
@@ -1313,7 +1314,8 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
 
   function sbShowSqlView() {
     const main = $('#sbMain'); if (!main) return;
-    main.querySelectorAll('.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
+    main.querySelectorAll('.sb-header,.sb-stat-bar,.sb-toolbar,.sb-content,.sb-pagination').forEach(el => el.style.display = 'none');
+    if ($('#sbSchemaWrap')) $('#sbSchemaWrap').remove();
     if (!$('#sbSqlWrap')) {
       const div = document.createElement('div');
       div.id = 'sbSqlWrap';
@@ -1339,7 +1341,6 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"</code>
       $('#sbSqlClear').onclick = () => { $('#sbSqlBox').value = ''; $('#sbSqlResult').innerHTML = ''; };
       $('#sbSqlBox').addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sbRunSql(); });
     }
-    $('#sbTableTitle').textContent = 'SQL Editor';
   }
 
   async function sbLoadTable() {
