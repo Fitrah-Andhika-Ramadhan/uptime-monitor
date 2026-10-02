@@ -194,6 +194,10 @@ switch ($action) {
     case 'instant-check':
     case 'insight':
     case 'chat':
+        check_csrf();
+        require_auth();
+        break;
+
     case 'quick-sec-scan':
         check_csrf();
         require_auth();
